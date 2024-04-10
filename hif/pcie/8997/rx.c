@@ -45,11 +45,8 @@ static int pcie_rx_ring_alloc(struct mwl_priv *priv)
 
 	desc = &pcie_priv->desc_data[0];
 
-	desc->prx_ring = (struct pcie_rx_desc *)
-		dma_alloc_coherent(priv->dev,
-				   MAX_NUM_RX_RING_BYTES,
-				   &desc->pphys_rx_ring,
-				   GFP_KERNEL);
+	desc->prx_ring = dma_alloc_coherent(priv->dev, MAX_NUM_RX_RING_BYTES, &desc->pphys_rx_ring,
+					    GFP_KERNEL);
 
 	if (!desc->prx_ring) {
 		wiphy_err(priv->hw->wiphy, "cannot alloc mem\n");
