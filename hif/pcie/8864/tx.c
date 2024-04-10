@@ -74,12 +74,8 @@ static int pcie_tx_ring_alloc(struct mwl_priv *priv)
 		desc->ptx_ring = (struct pcie_tx_desc *)
 			(mem + num * MAX_NUM_TX_RING_BYTES);
 
-		desc->pphys_tx_ring = (dma_addr_t)
-			((u32)pcie_priv->desc_data[0].pphys_tx_ring +
-			num * MAX_NUM_TX_RING_BYTES);
-
-		memset(desc->ptx_ring, 0x00,
-		       MAX_NUM_TX_RING_BYTES);
+		desc->pphys_tx_ring =
+			pcie_priv->desc_data[0].pphys_tx_ring + num * MAX_NUM_TX_RING_BYTES;
 	}
 
 	mem = kzalloc(MAX_NUM_TX_HNDL_BYTES * PCIE_NUM_OF_DESC_DATA,

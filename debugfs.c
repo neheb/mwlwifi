@@ -1907,12 +1907,11 @@ static ssize_t mwl_debugfs_core_dump_read(struct file *file, char __user *ubuf,
 		goto err;
 	}
 
-	buff = kmalloc(MAX_CORE_DUMP_BUFFER, GFP_ATOMIC);
+	buff = kzalloc(MAX_CORE_DUMP_BUFFER, GFP_ATOMIC);
 	if (!buff) {
 		ret = -ENOMEM;
 		goto err;
 	}
-	memset((char *)buff, 0, MAX_CORE_DUMP_BUFFER);
 
 	cd = kmalloc(sizeof(*cd), GFP_ATOMIC);
 	if (!cd) {

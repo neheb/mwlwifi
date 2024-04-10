@@ -53,8 +53,6 @@ static int pcie_rx_ring_alloc(struct mwl_priv *priv)
 		return -ENOMEM;
 	}
 
-	memset(desc->prx_ring, 0x00, MAX_NUM_RX_RING_BYTES);
-
 	desc->rx_hndl = kzalloc(MAX_NUM_RX_HNDL_BYTES, GFP_KERNEL);
 
 	if (!desc->rx_hndl) {
