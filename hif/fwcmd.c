@@ -1502,8 +1502,8 @@ int mwl_fwcmd_set_cfg_data(struct ieee80211_hw *hw, u16 type)
 		return -EIO;
 	pcmd->data_len = parsed_len;
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_CFG);
-	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd) +
-		le16_to_cpu(pcmd->data_len) - sizeof(pcmd->data));
+	pcmd->cmd_hdr.len =
+		cpu_to_le16(sizeof(*pcmd) + le16_to_cpu(pcmd->data_len) - sizeof(*pcmd->data));
 	pcmd->action = cpu_to_le16(HOSTCMD_ACT_GEN_SET);
 	pcmd->type = cpu_to_le16(type);
 
@@ -3779,8 +3779,7 @@ int mwl_fwcmd_set_txpwrlmt_cfg_data(struct ieee80211_hw *hw)
 		size -= parsed_len;
 
 		pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_TXPWRLMT_CFG);
-		pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd) +
-			data_len - sizeof(pcmd->data));
+		pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd) + data_len - sizeof(*pcmd->data));
 
 		if (size < sizeof(struct mwl_txpwrlmt_cfg_entry_hdr))
 			pcmd->cfgComplete = 1;
