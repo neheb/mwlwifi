@@ -562,14 +562,10 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 		    ieee80211_is_probe_resp(wh->frame_control))
 			tx_que_priority = PROBE_RESPONSE_TXQNUM;
 		else {
-			if ((
-			    (mwl_vif->macid == SYSADPT_NUM_OF_AP) &&
-			    (!ieee80211_has_protected(wh->frame_control) ||
-			    (ieee80211_has_protected(wh->frame_control) &&
-			    ieee80211_is_auth(wh->frame_control)))
-			    ) ||
-			    !sta ||
-			    ieee80211_is_auth(wh->frame_control) ||
+			if (((mwl_vif->macid == SYSADPT_NUM_OF_AP) &&
+			     (!ieee80211_has_protected(wh->frame_control) ||
+			      ieee80211_is_auth(wh->frame_control))) ||
+			    !sta || ieee80211_is_auth(wh->frame_control) ||
 			    ieee80211_is_assoc_req(wh->frame_control) ||
 			    ieee80211_is_assoc_resp(wh->frame_control))
 				tx_que_priority = MGMT_TXQNUM;
