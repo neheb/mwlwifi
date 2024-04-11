@@ -52,7 +52,6 @@ static int pcie_txbd_ring_create(struct mwl_priv *priv)
 {
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	int num;
-	u8 *mem;
 
 	/* driver maintaines the write pointer and firmware maintaines the read
 	 * pointer.
@@ -68,16 +67,13 @@ static int pcie_txbd_ring_create(struct mwl_priv *priv)
 	wiphy_info(priv->hw->wiphy, "TX ring: allocating %d bytes\n",
 		   pcie_priv->txbd_ring_size);
 
-	mem = dma_alloc_coherent(priv->dev,
-				 pcie_priv->txbd_ring_size,
-				 &pcie_priv->txbd_ring_pbase,
-				 GFP_KERNEL);
+	pcie_priv->txbd_ring_vbase = dma_alloc_coherent(priv->dev, pcie_priv->txbd_ring_size,
+							&pcie_priv->txbd_ring_pbase, GFP_KERNEL);
 
-	if (!mem) {
+	if (!pcie_priv->txbd_ring_vbase) {
 		wiphy_err(priv->hw->wiphy, "cannot alloc mem\n");
 		return -ENOMEM;
 	}
-	pcie_priv->txbd_ring_vbase = mem;
 	wiphy_info(priv->hw->wiphy,
 		   "TX ring: - base: %p, pbase: 0x%x, len: %d\n",
 		   pcie_priv->txbd_ring_vbase,
