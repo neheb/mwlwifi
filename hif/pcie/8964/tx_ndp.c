@@ -58,31 +58,21 @@ static int pcie_tx_ring_alloc_ndp(struct mwl_priv *priv)
 {
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
-	u8 *mem;
 
-	mem = dma_alloc_coherent(priv->dev,
-				 MAX_NUM_TX_RING_BYTES,
-				 &desc->pphys_tx_ring,
-				 GFP_KERNEL);
-	if (!mem)
+	desc->ptx_ring = dma_alloc_coherent(priv->dev, MAX_NUM_TX_RING_BYTES, &desc->pphys_tx_ring,
+					    GFP_KERNEL);
+	if (!desc->ptx_ring)
 		goto err_no_mem;
-	desc->ptx_ring = (struct pcie_tx_desc_ndp *)mem;
 
-	mem = dma_alloc_coherent(priv->dev,
-				 MAX_NUM_TX_RING_DONE_BYTES,
-				 &desc->pphys_tx_ring_done,
-				 GFP_KERNEL);
-	if (!mem)
+	desc->ptx_ring_done = dma_alloc_coherent(priv->dev, MAX_NUM_TX_RING_DONE_BYTES,
+						 &desc->pphys_tx_ring_done, GFP_KERNEL);
+	if (!desc->ptx_ring_done)
 		goto err_no_mem;
-	desc->ptx_ring_done = (struct tx_ring_done *)mem;
 
-	mem = dma_alloc_coherent(priv->dev,
-				 DEFAULT_ACNT_RING_SIZE,
-				 &desc->pphys_acnt_ring,
-				 GFP_KERNEL);
-	if (!mem)
+	desc->pacnt_ring = dma_alloc_coherent(priv->dev, DEFAULT_ACNT_RING_SIZE,
+					      &desc->pphys_acnt_ring, GFP_KERNEL);
+	if (!desc->pacnt_ring)
 		goto err_no_mem;
-	desc->pacnt_ring = (u8 *)mem;
 
 	desc->pacnt_buf = kzalloc(DEFAULT_ACNT_RING_SIZE, GFP_KERNEL);
 	if (!desc->pacnt_buf)
