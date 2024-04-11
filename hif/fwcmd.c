@@ -2906,7 +2906,7 @@ struct mwl_ampdu_stream *mwl_fwcmd_add_stream(struct ieee80211_hw *hw,
 						stream->idx = idx;
 						return stream;
 					}
-				};
+				}
 				break;
 			default:
 				for (idx = 0; idx < priv->ampdu_num; idx++) {
