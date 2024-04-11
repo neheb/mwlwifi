@@ -694,7 +694,7 @@ static void mwl_wds_check_handle(struct work_struct *work)
 
 	if (wds_sta) {
 		mwl_fwcmd_set_new_stn_wds_sc4(priv->hw, sta->addr);
-		sta_info->wds = true;
+		mwl_dev_get_sta(sta)->wds = true;
 	}
 
 	priv->wds_check = false;
