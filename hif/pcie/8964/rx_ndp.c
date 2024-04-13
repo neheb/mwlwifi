@@ -129,22 +129,13 @@ static void pcie_rx_ring_free_ndp(struct mwl_priv *priv)
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
 
-	if (desc->prx_ring) {
-		pcie_rx_ring_cleanup_ndp(priv);
-		dma_free_coherent(priv->dev,
-				  MAX_NUM_RX_RING_BYTES,
-				  desc->prx_ring,
-				  desc->pphys_rx_ring);
-		desc->prx_ring = NULL;
-	}
+	pcie_rx_ring_cleanup_ndp(priv);
+	dma_free_coherent(priv->dev, MAX_NUM_RX_RING_BYTES, desc->prx_ring, desc->pphys_rx_ring);
+	desc->prx_ring = NULL;
 
-	if (desc->prx_ring_done) {
-		dma_free_coherent(priv->dev,
-				  MAX_NUM_RX_RING_DONE_BYTES,
-				  desc->prx_ring_done,
-				  desc->pphys_rx_ring_done);
-		desc->prx_ring_done = NULL;
-	}
+	dma_free_coherent(priv->dev, MAX_NUM_RX_RING_DONE_BYTES, desc->prx_ring_done,
+			  desc->pphys_rx_ring_done);
+	desc->prx_ring_done = NULL;
 }
 
 static inline void pcie_rx_update_ndp_cnts(struct mwl_priv *priv, u32 ctrl)

@@ -191,17 +191,11 @@ static void pcie_tx_ring_free(struct mwl_priv *priv)
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	int num;
 
-	if (pcie_priv->desc_data[0].ptx_ring) {
-		dma_free_coherent(priv->dev,
-				  MAX_NUM_TX_RING_BYTES *
-				  PCIE_NUM_OF_DESC_DATA,
-				  pcie_priv->desc_data[0].ptx_ring,
-				  pcie_priv->desc_data[0].pphys_tx_ring);
-	}
+	dma_free_coherent(priv->dev, MAX_NUM_TX_RING_BYTES * PCIE_NUM_OF_DESC_DATA,
+			  pcie_priv->desc_data[0].ptx_ring, pcie_priv->desc_data[0].pphys_tx_ring);
 
 	for (num = 0; num < PCIE_NUM_OF_DESC_DATA; num++) {
-		if (pcie_priv->desc_data[num].ptx_ring)
-			pcie_priv->desc_data[num].ptx_ring = NULL;
+		pcie_priv->desc_data[num].ptx_ring = NULL;
 		pcie_priv->desc_data[num].pstale_tx_hndl = NULL;
 		pcie_priv->desc_data[num].pnext_tx_hndl = NULL;
 	}

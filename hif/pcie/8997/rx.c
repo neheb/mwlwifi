@@ -175,16 +175,11 @@ static void pcie_rx_ring_free(struct mwl_priv *priv)
 
 	desc = &pcie_priv->desc_data[0];
 
-	if (desc->prx_ring) {
-		pcie_rx_ring_cleanup(priv);
+	pcie_rx_ring_cleanup(priv);
 
-		dma_free_coherent(priv->dev,
-				  MAX_NUM_RX_RING_BYTES,
-				  desc->prx_ring,
-				  desc->pphys_rx_ring);
+	dma_free_coherent(priv->dev, MAX_NUM_RX_RING_BYTES, desc->prx_ring, desc->pphys_rx_ring);
 
-		desc->prx_ring = NULL;
-	}
+	desc->prx_ring = NULL;
 
 	kfree(desc->rx_hndl);
 
