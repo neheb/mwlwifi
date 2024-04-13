@@ -122,12 +122,8 @@ static void pcie_txbd_ring_delete(struct mwl_priv *priv)
 	struct pcie_tx_desc *tx_desc;
 	int num;
 
-	if (pcie_priv->txbd_ring_vbase) {
-		dma_free_coherent(priv->dev,
-				  pcie_priv->txbd_ring_size,
-				  pcie_priv->txbd_ring_vbase,
-				  pcie_priv->txbd_ring_pbase);
-	}
+	dma_free_coherent(priv->dev, pcie_priv->txbd_ring_size, pcie_priv->txbd_ring_vbase,
+			  pcie_priv->txbd_ring_pbase);
 
 	for (num = 0; num < PCIE_MAX_TXRX_BD; num++) {
 		pcie_priv->txbd_ring[num] = NULL;

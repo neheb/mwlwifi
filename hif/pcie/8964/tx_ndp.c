@@ -140,29 +140,16 @@ static void pcie_tx_ring_free_ndp(struct mwl_priv *priv)
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
 
-	if (desc->ptx_ring) {
-		dma_free_coherent(priv->dev,
-				  MAX_NUM_TX_RING_BYTES,
-				  desc->ptx_ring,
-				  desc->pphys_tx_ring);
-		desc->ptx_ring = NULL;
-	}
+	dma_free_coherent(priv->dev, MAX_NUM_TX_RING_BYTES, desc->ptx_ring, desc->pphys_tx_ring);
+	desc->ptx_ring = NULL;
 
-	if (desc->ptx_ring_done) {
-		dma_free_coherent(priv->dev,
-				  MAX_NUM_TX_RING_DONE_BYTES,
-				  desc->ptx_ring_done,
-				  desc->pphys_tx_ring_done);
-		desc->prx_ring_done = NULL;
-	}
+	dma_free_coherent(priv->dev, MAX_NUM_TX_RING_DONE_BYTES, desc->ptx_ring_done,
+			  desc->pphys_tx_ring_done);
+	desc->prx_ring_done = NULL;
 
-	if (desc->pacnt_ring) {
-		dma_free_coherent(priv->dev,
-				  DEFAULT_ACNT_RING_SIZE,
-				  desc->pacnt_ring,
-				  desc->pphys_acnt_ring);
-		desc->pacnt_ring = NULL;
-	}
+	dma_free_coherent(priv->dev, DEFAULT_ACNT_RING_SIZE, desc->pacnt_ring,
+			  desc->pphys_acnt_ring);
+	desc->pacnt_ring = NULL;
 
 	kfree(desc->pacnt_buf);
 }
