@@ -27,9 +27,6 @@
 #define MAX_NUM_RX_RING_BYTES  (PCIE_MAX_NUM_RX_DESC * \
 				sizeof(struct pcie_rx_desc))
 
-#define MAX_NUM_RX_HNDL_BYTES  (PCIE_MAX_NUM_RX_DESC * \
-				sizeof(struct pcie_rx_hndl))
-
 #define DECRYPT_ERR_MASK        0x80
 #define GENERAL_DECRYPT_ERR     0xFF
 #define TKIP_DECRYPT_MIC_ERR    0x02
@@ -53,7 +50,7 @@ static int pcie_rx_ring_alloc(struct mwl_priv *priv)
 		return -ENOMEM;
 	}
 
-	desc->rx_hndl = kzalloc(MAX_NUM_RX_HNDL_BYTES, GFP_KERNEL);
+	desc->rx_hndl = kcalloc(PCIE_MAX_NUM_RX_DESC, sizeof(struct pcie_rx_hndl), GFP_KERNEL);
 
 	if (!desc->rx_hndl) {
 		dma_free_coherent(priv->dev,
