@@ -132,7 +132,7 @@ static u32 pcie_read_mac_reg(struct pcie_priv *pcie_priv, u32 offset)
 	struct mwl_priv *priv = pcie_priv->mwl_priv;
 
 	if (priv->chip_type == MWL8964) {
-		u32 *addr_val = kmalloc(64 * sizeof(u32), GFP_ATOMIC);
+		u32 *addr_val = kmalloc_array(64, sizeof(u32), GFP_ATOMIC);
 		u32 val;
 
 		if (addr_val) {
@@ -746,7 +746,7 @@ static int pcie_reg_access(struct ieee80211_hw *hw, bool write)
 			       pcie_priv->iobase1 + priv->reg_offset);
 		break;
 	case MWL_ACCESS_ADDR:
-		addr_val = kzalloc(64 * sizeof(u32), GFP_KERNEL);
+		addr_val = kcalloc(64, sizeof(u32), GFP_KERNEL);
 		if (addr_val) {
 			addr_val[0] = priv->reg_value;
 			ret = mwl_fwcmd_get_addr_value(hw, priv->reg_offset,

@@ -854,8 +854,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	if (priv->chip_type == MWL8964) {
 		addr_num = SYSADPT_NUM_OF_AP + SYSADPT_NUM_OF_CLIENT;
 		hw->wiphy->n_addresses = addr_num;
-		hw->wiphy->addresses =
-			kzalloc(addr_num * sizeof(*mac_addr), GFP_KERNEL);
+		hw->wiphy->addresses = kcalloc(addr_num, sizeof(*mac_addr), GFP_KERNEL);
 
 		mac_addr = &hw->wiphy->addresses[0];
 		ether_addr_copy(mac_addr->addr, priv->hw_data.mac_addr);
@@ -1029,8 +1028,7 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 	priv->hif.priv = (char *)priv + ALIGN(sizeof(*priv), NETDEV_ALIGN);
 	priv->debug_ampdu = false;
 	priv->ampdu_num = mwl_hif_get_ampdu_num(hw);
-	priv->ampdu =
-		kzalloc(priv->ampdu_num * sizeof(*priv->ampdu), GFP_KERNEL);
+	priv->ampdu = kcalloc(priv->ampdu_num, sizeof(*priv->ampdu), GFP_KERNEL);
 	if (!priv->ampdu) {
 		ieee80211_free_hw(hw);
 		pr_err("alloc ampdu stream failed\n");
@@ -1041,8 +1039,7 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 		priv->stnid_num = SYSADPT_MAX_STA_SC4;
 	else
 		priv->stnid_num = SYSADPT_MAX_STA;
-	priv->stnid =
-		kzalloc(priv->stnid_num * sizeof(struct mwl_stnid), GFP_KERNEL);
+	priv->stnid = kcalloc(priv->stnid_num, sizeof(struct mwl_stnid), GFP_KERNEL);
 	if (!priv->stnid) {
 		kfree(priv->ampdu);
 		ieee80211_free_hw(hw);

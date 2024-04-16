@@ -78,8 +78,7 @@ static int pcie_tx_ring_alloc(struct mwl_priv *priv)
 			pcie_priv->desc_data[0].pphys_tx_ring + num * MAX_NUM_TX_RING_BYTES;
 	}
 
-	mem = kzalloc(MAX_NUM_TX_HNDL_BYTES * PCIE_NUM_OF_DESC_DATA,
-		      GFP_KERNEL);
+	mem = kcalloc(MAX_NUM_TX_HNDL_BYTES, PCIE_NUM_OF_DESC_DATA, GFP_KERNEL);
 
 	if (!mem) {
 		wiphy_err(priv->hw->wiphy, "cannot alloc mem\n");
