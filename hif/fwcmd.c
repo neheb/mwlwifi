@@ -3608,9 +3608,8 @@ int mwl_fwcmd_get_fw_core_dump(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_GET_FW_CORE_DUMP);
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->cmd_data.coredump.context = core_dump->context;
-	pcmd->cmd_data.coredump.buffer = cpu_to_le32(priv->pphys_cmd_buf +
-		sizeof(struct hostcmd_cmd_get_fw_core_dump) -
-		sizeof(struct hostcmd_cmd_get_fw_core_dump_));
+	pcmd->cmd_data.coredump.buffer = cpu_to_le32(
+		priv->pphys_cmd_buf + offsetof(struct hostcmd_cmd_get_fw_core_dump, buffer));
 	pcmd->cmd_data.coredump.buffer_len = cpu_to_le32(MAX_CORE_DUMP_BUFFER);
 	pcmd->cmd_data.coredump.size_kb = core_dump->size_kb;
 	pcmd->cmd_data.coredump.flags = core_dump->flags;
