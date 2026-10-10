@@ -782,7 +782,7 @@ static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
 		cpu_to_le16(skb->len - dma_hdrlen + tail_pad);
 }
 
-static inline void pcie_tx_encapsulate_frame(struct mwl_priv *priv,
+static inline int pcie_tx_encapsulate_frame(struct mwl_priv *priv,
 					     struct sk_buff *skb,
 					     struct ieee80211_key_conf *k_conf)
 {
@@ -822,6 +822,8 @@ static inline void pcie_tx_encapsulate_frame(struct mwl_priv *priv,
 	}
 
 	pcie_tx_add_dma_header(priv, skb, head_pad, data_pad);
+
+	return data_pad;
 }
 
 static inline void pcie_tx_prepare_info(struct mwl_priv *priv, u32 rate,

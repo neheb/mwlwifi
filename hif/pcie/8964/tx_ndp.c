@@ -41,6 +41,7 @@
 #define TX_CTRL_TYPE_DATA       BIT(0)
 #define TX_CTRL_EAPOL           BIT(1)
 #define TX_CTRL_TCP_ACK         BIT(2)
+#define TX_CTRL_MIC_ROOM        BIT(3)
 
 /* Transmission information to transmit a socket buffer.
  */
@@ -466,6 +467,10 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 			dev_kfree_skb_any(skb);
 			goto bypass_ack;
 		} else {
+			if (tx_ctrl->flags & TX_CTRL_MIC_ROOM)
+				skb_trim(skb,
+					 skb->len - IEEE80211_CCMP_MIC_LEN);
+
 			/* Remove H/W dma header */
 			dma_data = (struct pcie_dma_data *)skb->data;
 
@@ -526,6 +531,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 	bool eapol_frame = false;
 	bool start_ba_session = false;
 	struct pcie_tx_ctrl_ndp *tx_ctrl;
+	int mic_room = 0;
 
 	tx_info = IEEE80211_SKB_CB(skb);
 	k_conf = tx_info->control.hw_key;
@@ -601,7 +607,9 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 			ieee80211_tx_status(hw, ack_skb);
 		}
 
-		pcie_tx_encapsulate_frame(priv, skb, k_conf);
+		mic_room = pcie_tx_encapsulate_frame(priv, skb, k_conf);
+		if (!k_conf || k_conf->cipher != WLAN_CIPHER_SUITE_CCMP)
+			mic_room = 0;
 	} else {
 		tid = qos & 0x7;
 		if (sta && sta->ht_cap.ht_supported && !eapol_frame &&
@@ -659,12 +667,26 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 		}
 	}
 
+	if (mic_room) {
+		/* The firmware expects the length of a protected
+		 * management frame to include room for the MIC.
+		 */
+		if (skb_tailroom(skb) < mic_room &&
+		    pskb_expand_head(skb, 0, mic_room, GFP_ATOMIC))
+			mic_room = 0;
+		else
+			skb_put_zero(skb, mic_room);
+		wh = &((struct pcie_dma_data *)skb->data)->wh;
+	}
+
 	index = SYSADPT_TX_WMM_QUEUES - index - 1;
 
 	tx_ctrl = (struct pcie_tx_ctrl_ndp *)tx_info->driver_data;
 	tx_ctrl->tx_que_priority = tx_que_priority;
 	tx_ctrl->hdrlen = ieee80211_hdrlen(wh->frame_control);
 	tx_ctrl->flags = 0;
+	if (mic_room)
+		tx_ctrl->flags |= TX_CTRL_MIC_ROOM;
 	tx_ctrl->qos = qos;
 	if (!mgmtframe)
 		tx_ctrl->flags |= TX_CTRL_TYPE_DATA;
