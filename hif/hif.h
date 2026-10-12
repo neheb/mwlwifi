@@ -71,7 +71,6 @@ struct mwl_hif_ops {
 	struct device_node *(*get_device_node)(struct ieee80211_hw *hw);
 	void (*get_survey)(struct ieee80211_hw *hw,
 			   struct mwl_survey_info *survey_info);
-	int (*reg_access)(struct ieee80211_hw *hw, bool write);
 	void (*set_sta_id)(struct ieee80211_hw *hw,
 			   struct ieee80211_sta *sta,
 			   bool sta_mode, bool set);

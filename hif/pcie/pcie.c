@@ -684,66 +684,6 @@ static void pcie_get_survey(struct ieee80211_hw *hw,
 	survey_info->noise = priv->noise;
 }
 
-static int pcie_reg_access(struct ieee80211_hw *hw, bool write)
-{
-	struct mwl_priv *priv = hw->priv;
-	struct pcie_priv *pcie_priv = priv->hif.priv;
-	u8 set;
-	u32 *addr_val;
-	int ret = 0;
-
-	set = write ? WL_SET : WL_GET;
-
-	switch (priv->reg_type) {
-	case MWL_ACCESS_RF:
-		ret = mwl_fwcmd_reg_rf(hw, set, priv->reg_offset,
-				       &priv->reg_value);
-		break;
-	case MWL_ACCESS_BBP:
-		ret = mwl_fwcmd_reg_bb(hw, set, priv->reg_offset,
-				       &priv->reg_value);
-		break;
-	case MWL_ACCESS_CAU:
-		ret = mwl_fwcmd_reg_cau(hw, set, priv->reg_offset,
-					&priv->reg_value);
-		break;
-	case MWL_ACCESS_ADDR0:
-		if (set == WL_GET)
-			priv->reg_value =
-				readl(pcie_priv->iobase0 + priv->reg_offset);
-		else
-			writel(priv->reg_value,
-			       pcie_priv->iobase0 + priv->reg_offset);
-		break;
-	case MWL_ACCESS_ADDR1:
-		if (set == WL_GET)
-			priv->reg_value =
-				readl(pcie_priv->iobase1 + priv->reg_offset);
-		else
-			writel(priv->reg_value,
-			       pcie_priv->iobase1 + priv->reg_offset);
-		break;
-	case MWL_ACCESS_ADDR:
-		addr_val = kzalloc(64 * sizeof(u32), GFP_KERNEL);
-		if (addr_val) {
-			addr_val[0] = priv->reg_value;
-			ret = mwl_fwcmd_get_addr_value(hw, priv->reg_offset,
-						       4, addr_val, set);
-			if ((!ret) && (set == WL_GET))
-				priv->reg_value = addr_val[0];
-			kfree(addr_val);
-		} else {
-			ret = -ENOMEM;
-		}
-		break;
-	default:
-		ret = -EINVAL;
-		break;
-	}
-
-	return ret;
-}
-
 static struct mwl_hif_ops pcie_hif_ops_8997 = {
 	.driver_name           = PCIE_DRV_NAME,
 	.driver_version        = PCIE_DRV_VERSION,
@@ -770,7 +710,6 @@ static struct mwl_hif_ops pcie_hif_ops_8997 = {
 	.tx_return_pkts        = pcie_8997_tx_return_pkts,
 	.get_device_node       = pcie_get_device_node,
 	.get_survey            = pcie_get_survey,
-	.reg_access            = pcie_reg_access,
 };
 
 static struct mwl_hif_ops pcie_hif_ops_8864 = {
@@ -799,7 +738,6 @@ static struct mwl_hif_ops pcie_hif_ops_8864 = {
 	.tx_return_pkts        = pcie_8864_tx_return_pkts,
 	.get_device_node       = pcie_get_device_node,
 	.get_survey            = pcie_get_survey,
-	.reg_access            = pcie_reg_access,
 };
 
 static int pcie_init_ndp(struct ieee80211_hw *hw)
@@ -1611,7 +1549,6 @@ static const struct mwl_hif_ops pcie_hif_ops_ndp = {
 	.tx_return_pkts        = pcie_tx_return_pkts_ndp,
 	.get_device_node       = pcie_get_device_node,
 	.get_survey            = pcie_get_survey,
-	.reg_access            = pcie_reg_access,
 	.set_sta_id            = pcie_set_sta_id,
 	.process_account       = pcie_process_account,
 	.mcast_cts             = pcie_mcast_cts,

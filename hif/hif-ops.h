@@ -257,16 +257,6 @@ static inline void mwl_hif_get_survey(struct ieee80211_hw *hw,
 		priv->hif.ops->get_survey(hw, survey_info);
 }
 
-static inline int mwl_hif_reg_access(struct ieee80211_hw *hw, bool write)
-{
-	struct mwl_priv *priv = hw->priv;
-
-	if (priv->hif.ops->reg_access)
-		return priv->hif.ops->reg_access(hw, write);
-	else
-		return -ENOTSUPP;
-}
-
 static inline void mwl_hif_set_sta_id(struct ieee80211_hw *hw,
 				      struct ieee80211_sta *sta,
 				      bool sta_mode, bool set)

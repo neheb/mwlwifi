@@ -324,7 +324,6 @@ struct mwl_priv {
 	struct work_struct wds_check_handle;
 	u8 wds_check_sta[ETH_ALEN];
 
-	bool dfs_test;
 	bool csa_active;
 	struct work_struct chnl_switch_handle;
 	enum nl80211_dfs_regions dfs_region;
@@ -345,9 +344,6 @@ struct mwl_priv {
 	u8 led_blink_rate;
 
 	struct dentry *debugfs_phy;
-	u32 reg_type;
-	u32 reg_offset;
-	u32 reg_value;
 	int ra_aid;
 	int ba_aid;
 	int fixed_rate;

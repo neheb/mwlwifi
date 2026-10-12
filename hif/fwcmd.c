@@ -922,61 +922,6 @@ int mwl_fwcmd_get_stat(struct ieee80211_hw *hw,
 	return 0;
 }
 
-int mwl_fwcmd_reg_bb(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val)
-{
-	struct mwl_priv *priv = hw->priv;
-	struct hostcmd_cmd_bbp_reg_access *pcmd;
-
-	pcmd = (struct hostcmd_cmd_bbp_reg_access *)&priv->pcmd_buf[0];
-
-	mutex_lock(&priv->fwcmd_mutex);
-
-	memset(pcmd, 0x00, sizeof(*pcmd));
-	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_BBP_REG_ACCESS);
-	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
-	pcmd->offset = cpu_to_le16(reg);
-	pcmd->action = cpu_to_le16(flag);
-	pcmd->value = *val;
-
-	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_BBP_REG_ACCESS)) {
-		mutex_unlock(&priv->fwcmd_mutex);
-		return -EIO;
-	}
-
-	*val = pcmd->value;
-	mutex_unlock(&priv->fwcmd_mutex);
-
-	return 0;
-}
-
-int mwl_fwcmd_reg_rf(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val)
-{
-	struct mwl_priv *priv = hw->priv;
-	struct hostcmd_cmd_rf_reg_access *pcmd;
-
-	pcmd = (struct hostcmd_cmd_rf_reg_access *)&priv->pcmd_buf[0];
-
-	mutex_lock(&priv->fwcmd_mutex);
-
-	memset(pcmd, 0x00, sizeof(*pcmd));
-	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_RF_REG_ACCESS);
-	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
-	pcmd->offset = cpu_to_le16(reg);
-	pcmd->action = cpu_to_le16(flag);
-	pcmd->value = *val;
-
-	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_RF_REG_ACCESS)) {
-		mutex_unlock(&priv->fwcmd_mutex);
-		return -EIO;
-	}
-
-	*val = pcmd->value;
-
-	mutex_unlock(&priv->fwcmd_mutex);
-
-	return 0;
-}
-
 int mwl_fwcmd_radio_enable(struct ieee80211_hw *hw)
 {
 	return mwl_fwcmd_802_11_radio_control(hw->priv, true, false);
@@ -2414,7 +2359,7 @@ int mwl_fwcmd_set_switch_channel(struct ieee80211_hw *hw,
 	pcmd->init_count = cpu_to_le32(ch_switch->count + 1);
 	pcmd->chnl_flags = cpu_to_le32(chnl_flags);
 	pcmd->next_ht_extchnl_offset = cpu_to_le32(sec_chnl_offset);
-	pcmd->dfs_test_mode = cpu_to_le32(priv->dfs_test);
+	pcmd->dfs_test_mode = 0;
 
 	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_SET_SWITCH_CHANNEL)) {
 		mutex_unlock(&priv->fwcmd_mutex);
@@ -3143,34 +3088,6 @@ int mwl_fwcmd_set_bftype(struct ieee80211_hw *hw, int mode)
 		mutex_unlock(&priv->fwcmd_mutex);
 		return -EIO;
 	}
-
-	mutex_unlock(&priv->fwcmd_mutex);
-
-	return 0;
-}
-
-int mwl_fwcmd_reg_cau(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val)
-{
-	struct mwl_priv *priv = hw->priv;
-	struct hostcmd_cmd_bbp_reg_access *pcmd;
-
-	pcmd = (struct hostcmd_cmd_bbp_reg_access *)&priv->pcmd_buf[0];
-
-	mutex_lock(&priv->fwcmd_mutex);
-
-	memset(pcmd, 0x00, sizeof(*pcmd));
-	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_CAU_REG_ACCESS);
-	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
-	pcmd->offset = cpu_to_le16(reg);
-	pcmd->action = cpu_to_le16(flag);
-	pcmd->value = *val;
-
-	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_CAU_REG_ACCESS)) {
-		mutex_unlock(&priv->fwcmd_mutex);
-		return -EIO;
-	}
-
-	*val = pcmd->value;
 
 	mutex_unlock(&priv->fwcmd_mutex);
 
