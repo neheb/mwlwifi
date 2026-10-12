@@ -20,6 +20,7 @@
 
 #include "sysadpt.h"
 #include "core.h"
+#include "compat.h"
 #include "utils.h"
 #include "hif/fwcmd.h"
 #include "hif/pcie/dev.h"
@@ -699,9 +700,9 @@ void pcie_8997_tx_xmit(struct ieee80211_hw *hw,
 		if (unlikely(ieee80211_is_action(wh->frame_control) &&
 			     !ieee80211_has_protected(wh->frame_control) &&
 			     mgmt->u.action.category == WLAN_CATEGORY_BACK &&
-			     mgmt->u.action.action_code ==
+			     MWL_ACTION_CODE(mgmt) ==
 			     WLAN_ACTION_ADDBA_REQ)) {
-			capab = le16_to_cpu(mgmt->u.action.addba_req.capab);
+			capab = le16_to_cpu(MWL_ADDBA_REQ(mgmt).capab);
 			tid = (capab & IEEE80211_ADDBA_PARAM_TID_MASK) >> 2;
 			if (tid < IEEE80211_FIRST_TSPEC_TSID)
 				index = utils_tid_to_ac(tid);
