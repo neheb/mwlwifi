@@ -718,8 +718,8 @@ static void mwl_chnl_switch_event(struct work_struct *work)
 		vif = container_of((void *)mwl_vif, struct ieee80211_vif,
 				   drv_priv);
 
-		if (vif->csa_active)
-			ieee80211_csa_finish(vif);
+		if (vif->bss_conf.csa_active)
+			ieee80211_csa_finish(vif, 0);
 	}
 	spin_unlock_bh(&priv->vif_lock);
 
@@ -738,7 +738,7 @@ static irqreturn_t mwl_isr(int irq, void *dev_id)
 #ifdef timer_setup
 static void timer_routine(struct timer_list *t)
 {
-	struct mwl_priv *priv = from_timer(priv, t, period_timer);
+	struct mwl_priv *priv = timer_container_of(priv, t, period_timer);
 	struct ieee80211_hw *hw = priv->hw;
 #else
 static void timer_routine(unsigned long data)
@@ -975,7 +975,7 @@ static void mwl_wl_deinit(struct mwl_priv *priv)
 {
 	struct ieee80211_hw *hw = priv->hw;
 
-	del_timer_sync(&priv->period_timer);
+	timer_delete_sync(&priv->period_timer);
 
 	if (priv->irq != -1) {
 		free_irq(priv->irq, hw);

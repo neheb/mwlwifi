@@ -215,9 +215,10 @@ static int pcie_init_8997(struct ieee80211_hw *hw)
 		     (void *)pcie_8997_tx_done_task, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->tx_done_task);
 	spin_lock_init(&pcie_priv->tx_desc_lock);
-	init_dummy_netdev(&pcie_priv->napi_dev);
-	netif_napi_add(&pcie_priv->napi_dev, &pcie_priv->napi,
-		       pcie_8997_poll_napi);
+	pcie_priv->napi_dev = alloc_netdev_dummy(0);
+	if (!pcie_priv->napi_dev)
+		return -ENOMEM;
+	netif_napi_add(pcie_priv->napi_dev, &pcie_priv->napi, pcie_8997_poll_napi);
 	pcie_priv->txq_limit = PCIE_TX_QUEUE_LIMIT;
 	pcie_priv->txq_wake_threshold = PCIE_TX_WAKE_Q_THRESHOLD;
 	pcie_priv->recv_limit = PCIE_RECEIVE_LIMIT;
@@ -290,6 +291,8 @@ err_mwl_rx_init:
 	pcie_8997_tx_deinit(hw);
 
 err_mwl_tx_init:
+	netif_napi_del(&pcie_priv->napi);
+	free_netdev(pcie_priv->napi_dev);
 
 	wiphy_err(hw->wiphy, "%s: init fail\n", PCIE_DRV_NAME);
 
@@ -310,8 +313,10 @@ static int pcie_init_8864(struct ieee80211_hw *hw)
 	tasklet_init(&pcie_priv->tx_done_task, (void *)pcie_8864_tx_done_task, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->tx_done_task);
 	spin_lock_init(&pcie_priv->tx_desc_lock);
-	init_dummy_netdev(&pcie_priv->napi_dev);
-	netif_napi_add(&pcie_priv->napi_dev, &pcie_priv->napi, pcie_8864_poll_napi);
+	pcie_priv->napi_dev = alloc_netdev_dummy(0);
+	if (!pcie_priv->napi_dev)
+		return -ENOMEM;
+	netif_napi_add(pcie_priv->napi_dev, &pcie_priv->napi, pcie_8864_poll_napi);
 	pcie_priv->txq_limit = PCIE_TX_QUEUE_LIMIT;
 	pcie_priv->txq_wake_threshold = PCIE_TX_WAKE_Q_THRESHOLD;
 	pcie_priv->recv_limit = PCIE_RECEIVE_LIMIT;
@@ -385,6 +390,8 @@ err_mwl_rx_init:
 	pcie_8864_tx_deinit(hw);
 
 err_mwl_tx_init:
+	netif_napi_del(&pcie_priv->napi);
+	free_netdev(pcie_priv->napi_dev);
 
 	wiphy_err(hw->wiphy, "%s: init fail\n", PCIE_DRV_NAME);
 
@@ -400,6 +407,8 @@ static void pcie_deinit_8997(struct ieee80211_hw *hw)
 	pcie_8997_tx_deinit(hw);
 	tasklet_kill(&pcie_priv->tx_done_task);
 	tasklet_kill(&pcie_priv->tx_task);
+	netif_napi_del(&pcie_priv->napi);
+	free_netdev(pcie_priv->napi_dev);
 	pcie_reset(hw);
 }
 
@@ -412,6 +421,8 @@ static void pcie_deinit_8864(struct ieee80211_hw *hw)
 	pcie_8864_tx_deinit(hw);
 	tasklet_kill(&pcie_priv->tx_done_task);
 	tasklet_kill(&pcie_priv->tx_task);
+	netif_napi_del(&pcie_priv->napi);
+	free_netdev(pcie_priv->napi_dev);
 	pcie_reset(hw);
 }
 
@@ -533,7 +544,7 @@ static irqreturn_t pcie_isr_8864(struct ieee80211_hw *hw)
 
 		if (int_status & MACREG_A2HRIC_BIT_RADAR_DETECT) {
 			wiphy_info(hw->wiphy, "radar detected by firmware\n");
-			ieee80211_radar_detected(hw);
+			ieee80211_radar_detected(hw, NULL);
 		}
 
 		if (int_status & MACREG_A2HRIC_BIT_CHAN_SWITCH)
@@ -575,7 +586,7 @@ static irqreturn_t pcie_isr_8997(struct ieee80211_hw *hw)
 
 		if (int_status & MACREG_A2HRIC_BIT_RADAR_DETECT) {
 			wiphy_info(hw->wiphy, "radar detected by firmware\n");
-			ieee80211_radar_detected(hw);
+			ieee80211_radar_detected(hw, NULL);
 		}
 
 		if (int_status & MACREG_A2HRIC_BIT_CHAN_SWITCH)
@@ -1053,7 +1064,7 @@ static irqreturn_t pcie_isr_ndp(struct ieee80211_hw *hw)
 
 		if (int_status & MACREG_A2HRIC_NEWDP_DFS) {
 			wiphy_info(hw->wiphy, "radar detected by firmware\n");
-			ieee80211_radar_detected(hw);
+			ieee80211_radar_detected(hw, NULL);
 		}
 
 		if (int_status & MACREG_A2HRIC_NEWDP_CHANNEL_SWITCH)

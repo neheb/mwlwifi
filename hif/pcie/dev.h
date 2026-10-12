@@ -583,7 +583,7 @@ struct pcie_priv {
 	struct tasklet_struct tx_task;
 	struct tasklet_struct tx_done_task;
 	/* NAPI */
-	struct net_device napi_dev;
+	struct net_device *napi_dev;
 	struct napi_struct napi;
 	struct tasklet_struct rx_task;
 	unsigned int tx_head_room;
