@@ -25,7 +25,6 @@
 #include "hif/fwcmd.h"
 #include "hif/hif-ops.h"
 
-#define CMD_BUF_SIZE     0x4000
 #define INVALID_WATCHDOG 0xAA
 
 static const struct ieee80211_channel mwl_channels_24[] = {
@@ -152,7 +151,7 @@ static int mwl_prepare_cmd_buf(struct mwl_priv *priv)
 {
 	priv->pcmd_buf =
 		(unsigned short *)dmam_alloc_coherent(priv->dev,
-						      CMD_BUF_SIZE,
+						      MWL_CMD_BUF_SIZE,
 						      &priv->pphys_cmd_buf,
 						      GFP_KERNEL);
 	if (!priv->pcmd_buf) {
@@ -164,7 +163,7 @@ static int mwl_prepare_cmd_buf(struct mwl_priv *priv)
 		    "priv->pcmd_buf = %p  priv->pphys_cmd_buf = %p\n",
 		    priv->pcmd_buf,
 		    (void *)priv->pphys_cmd_buf);
-	memset(priv->pcmd_buf, 0x00, CMD_BUF_SIZE);
+	memset(priv->pcmd_buf, 0x00, MWL_CMD_BUF_SIZE);
 
 	return 0;
 

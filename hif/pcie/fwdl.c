@@ -18,6 +18,7 @@
  */
 
 #include <linux/io.h>
+#include <linux/iopoll.h>
 
 #include "sysadpt.h"
 #include "core.h"
@@ -29,7 +30,55 @@
 #define FW_DOWNLOAD_BLOCK_SIZE          256
 #define FW_CHECK_MSECS                  3
 
-#define FW_MAX_NUM_CHECKS               0xffff
+/* The bootrom acknowledges a block within microseconds; these are only
+ * there so that a dead device can't hang the host.
+ */
+#define FW_BOOTROM_READY_TIMEOUT_US     (5 * USEC_PER_SEC)
+#define FW_BLOCK_ACK_TIMEOUT_US         USEC_PER_SEC
+#define FW_BLOCK_ACK_POLL_US            2
+#define FW_READY_TIMEOUT_MS             (30 * MSEC_PER_SEC)
+
+/* Copy the block the bootrom asked for into the command buffer. The size
+ * comes from the device, so bound it by the buffer and zero-pad the last
+ * block rather than reading past the end of the image.
+ */
+static int pcie_fill_block(struct mwl_priv *priv, const u8 *data,
+			   size_t remaining, u32 len)
+{
+	u8 *buf = (u8 *)priv->pcmd_buf;
+
+	if (len > MWL_CMD_BUF_SIZE) {
+		wiphy_err(priv->hw->wiphy,
+			  "bootrom requested %u byte block\n", len);
+		return -EIO;
+	}
+
+	memcpy(buf, data, min_t(size_t, len, remaining));
+	if (len > remaining)
+		memset(buf + remaining, 0, len - remaining);
+
+	return 0;
+}
+
+/* Wait for the bootrom to pick up the block sent by
+ * pcie_trigger_pcicmd_bootcode(): it first sets C1C, then clears the
+ * doorbell bit once it is done with the block.
+ */
+static int pcie_wait_block_ack(struct pcie_priv *pcie_priv)
+{
+	void __iomem *reg = pcie_priv->iobase1 + 0xc1c;
+	u32 int_code;
+	int ret;
+
+	ret = readl_poll_timeout(reg, int_code, int_code != 0,
+				 FW_BLOCK_ACK_POLL_US, FW_BLOCK_ACK_TIMEOUT_US);
+	if (ret)
+		return ret;
+
+	return readl_poll_timeout(reg, int_code,
+				  !(int_code & MACREG_H2ARIC_BIT_DOOR_BELL),
+				  FW_BLOCK_ACK_POLL_US, FW_BLOCK_ACK_TIMEOUT_US);
+}
 
 static void pcie_trigger_pcicmd_bootcode(struct pcie_priv *pcie_priv)
 {
@@ -45,9 +94,7 @@ static bool pcie_download_ddr_init(struct mwl_priv *priv)
 	struct pcie_priv *pcie_priv = (struct pcie_priv *)priv->hif.priv;
 	u32 size_ddr_init = sizeof(sc4_ddr_init);
 	u8 *p = (u8 *)&sc4_ddr_init[0];
-	u32 curr_iteration = 0;
 	u32 size_ddr_init_downloaded = 0;
-	u32 int_code = 0;
 	u32 len = 0;
 
 	/* download ddr init code */
@@ -60,44 +107,16 @@ static bool pcie_download_ddr_init(struct mwl_priv *priv)
 			break;
 
 		/* this copies the next chunk of fw binary to be delivered */
-		memcpy((char *)&priv->pcmd_buf[0], p, len);
-		/* this is arbitrary per your platform; we use 0xffff */
-		curr_iteration = (FW_MAX_NUM_CHECKS * 500);
+		if (pcie_fill_block(priv, p,
+				    size_ddr_init - size_ddr_init_downloaded,
+				    len))
+			return false;
 		/* this function writes pdata to c10, then write 2 to c18 */
 		pcie_trigger_pcicmd_bootcode(pcie_priv);
 
-		/* NOTE: the following back to back checks on C1C is time
-		 * sensitive, hence may need to be tweaked dependent on host
-		 * processor. Time for SC2 to go from the write of event 2 to
-		 * C1C == 2 is ~1300 nSec. Hence the checkings on host has to
-		 * consider how efficient your code can be to meet this timing,
-		 * or you can alternatively tweak this routines to fit your
-		 * platform
-		 */
-		do {
-			int_code = readl(pcie_priv->iobase1 + 0xc1c);
-			if (int_code != 0)
-				break;
-			cond_resched();
-			curr_iteration--;
-		} while (curr_iteration);
-
-		do {
-			int_code = readl(pcie_priv->iobase1 + 0xc1c);
-			if ((int_code & MACREG_H2ARIC_BIT_DOOR_BELL) !=
-			    MACREG_H2ARIC_BIT_DOOR_BELL)
-				break;
-			cond_resched();
-			curr_iteration--;
-		} while (curr_iteration);
-
-		if (curr_iteration == 0) {
-			/* This limited loop check allows you to exit gracefully
-			 * without locking up your entire system just because fw
-			 * download failed
-			 */
+		if (pcie_wait_block_ack(pcie_priv)) {
 			wiphy_err(priv->hw->wiphy,
-				  "Exhausted curr_iteration during download\n");
+				  "timeout waiting for ddr init block ack\n");
 			return false;
 		}
 
@@ -130,7 +149,7 @@ int pcie_download_firmware(struct ieee80211_hw *hw)
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	const struct firmware *fw = priv->fw_ucode;
-	u32 curr_iteration = 0;
+	unsigned long timeout;
 	u32 size_fw_downloaded = 0;
 	u32 int_code = 0;
 	u32 len = 0;
@@ -174,8 +193,11 @@ int pcie_download_firmware(struct ieee80211_hw *hw)
 		writel(0x100, pcie_priv->iobase1 + 0xE0E4);
 
 	/* make sure SCRATCH2 C40 is clear, in case we are too quick */
-	while (readl(pcie_priv->iobase1 + 0xc40) == 0)
-		cond_resched();
+	if (readl_poll_timeout(pcie_priv->iobase1 + 0xc40, len, len != 0,
+			       10, FW_BOOTROM_READY_TIMEOUT_US)) {
+		wiphy_err(hw->wiphy, "timeout waiting for bootrom\n");
+		goto err_download;
+	}
 
 	if (priv->chip_type == MWL8964) {
 		if (!pcie_download_ddr_init(priv)) {
@@ -192,48 +214,24 @@ int pcie_download_firmware(struct ieee80211_hw *hw)
 			break;
 
 		/* this copies the next chunk of fw binary to be delivered */
-		memcpy((char *)&priv->pcmd_buf[0],
-		       (fw->data + size_fw_downloaded), len);
+		if (pcie_fill_block(priv, fw->data + size_fw_downloaded,
+				    fw->size - size_fw_downloaded, len))
+			goto err_download;
 
 		/* this function writes pdata to c10, then write 2 to c18 */
 		pcie_trigger_pcicmd_bootcode(pcie_priv);
 
-		/* this is arbitrary per your platform; we use 0xffff */
-		curr_iteration = FW_MAX_NUM_CHECKS;
-
-		/* NOTE: the following back to back checks on C1C is time
-		 * sensitive, hence may need to be tweaked dependent on host
-		 * processor. Time for SC2 to go from the write of event 2 to
-		 * C1C == 2 is ~1300 nSec. Hence the checkings on host has to
-		 * consider how efficient your code can be to meet this timing,
-		 * or you can alternatively tweak this routines to fit your
-		 * platform
-		 */
-		do {
-			int_code = readl(pcie_priv->iobase1 + 0xc1c);
-			if ((int_code & MACREG_H2ARIC_BIT_DOOR_BELL) !=
-			    MACREG_H2ARIC_BIT_DOOR_BELL)
-				break;
-			cond_resched();
-			curr_iteration--;
-		} while (curr_iteration);
-
-		if (curr_iteration == 0) {
-			/* This limited loop check allows you to exit gracefully
-			 * without locking up your entire system just because fw
-			 * download failed
-			 */
+		if (pcie_wait_block_ack(pcie_priv)) {
 			wiphy_err(hw->wiphy,
-				  "Exhausted curr_iteration for fw download\n");
+				  "timeout waiting for fw block ack\n");
 			goto err_download;
 		}
 
 		size_fw_downloaded += len;
 	}
 
-	wiphy_debug(hw->wiphy,
-		    "FwSize = %d downloaded Size = %d curr_iteration %d\n",
-		    (int)fw->size, size_fw_downloaded, curr_iteration);
+	wiphy_debug(hw->wiphy, "FwSize = %zu downloaded Size = %u\n",
+		    fw->size, size_fw_downloaded);
 
 	/* Now firmware is downloaded successfully, so this part is to check
 	 * whether fw can properly execute to an extent that write back
@@ -243,21 +241,19 @@ int pcie_download_firmware(struct ieee80211_hw *hw)
 	 */
 	*((u32 *)&priv->pcmd_buf[1]) = 0;
 	pcie_trigger_pcicmd_bootcode(pcie_priv);
-	curr_iteration = FW_MAX_NUM_CHECKS;
+	timeout = jiffies + msecs_to_jiffies(FW_READY_TIMEOUT_MS);
 	do {
-		curr_iteration--;
 		writel(HOSTCMD_SOFTAP_MODE,
 		       pcie_priv->iobase1 + MACREG_REG_GEN_PTR);
 		usleep_range(FW_CHECK_MSECS * 1000, FW_CHECK_MSECS * 2000);
 		int_code = readl(pcie_priv->iobase1 + MACREG_REG_INT_CODE);
-		if (!(curr_iteration % 0xff) && (int_code != 0))
-			wiphy_err(hw->wiphy, "%x;", int_code);
-	} while ((curr_iteration) &&
-		 (int_code != fwreadysignature));
+	} while (int_code != fwreadysignature &&
+		 time_before(jiffies, timeout));
 
-	if (curr_iteration == 0) {
+	if (int_code != fwreadysignature) {
 		wiphy_err(hw->wiphy,
-			  "Exhausted curr_iteration for fw signature\n");
+			  "timeout waiting for fw ready signature (0x%08x)\n",
+			  int_code);
 		goto err_download;
 	}
 

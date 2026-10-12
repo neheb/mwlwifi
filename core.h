@@ -362,6 +362,8 @@ struct mwl_priv {
 	u32 feature;
 };
 
+#define MWL_CMD_BUF_SIZE 0x4000
+
 /* Size of the firmware's SET_IES proprietary element buffer */
 #define MWL_IE_LIST_PROPRIETARY_LEN 112
 
