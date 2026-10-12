@@ -1362,15 +1362,10 @@ int mwl_fwcmd_set_cfg_data(struct ieee80211_hw *hw, u16 type)
 
 	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_SET_CFG)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		release_firmware(priv->cal_data);
-		priv->cal_data = NULL;
 		return -EIO;
 	}
 
 	mutex_unlock(&priv->fwcmd_mutex);
-
-	release_firmware(priv->cal_data);
-	priv->cal_data = NULL;
 
 	return 0;
 }
@@ -3558,8 +3553,6 @@ int mwl_fwcmd_set_txpwrlmt_cfg_data(struct ieee80211_hw *hw)
 	if (le32_to_cpu(txpwr_cfg_sig) != TXPWRLMT_CFG_SIGNATURE) {
 		wiphy_err(hw->wiphy,
 			  "txpwrlmt config signature mismatch\n");
-		release_firmware(priv->txpwrlmt_file);
-		priv->txpwrlmt_file = NULL;
 		return 0;
 	}
 
@@ -3602,8 +3595,6 @@ int mwl_fwcmd_set_txpwrlmt_cfg_data(struct ieee80211_hw *hw)
 		if (mwl_fwcmd_parse_hex(ptr, size, pcmd->data, data_len,
 					&parsed_len) < 0) {
 			mutex_unlock(&priv->fwcmd_mutex);
-			release_firmware(priv->txpwrlmt_file);
-			priv->txpwrlmt_file = NULL;
 			return -EIO;
 		}
 
@@ -3619,16 +3610,11 @@ int mwl_fwcmd_set_txpwrlmt_cfg_data(struct ieee80211_hw *hw)
 
 		if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_TXPWRLMT_CFG)) {
 			mutex_unlock(&priv->fwcmd_mutex);
-			release_firmware(priv->txpwrlmt_file);
-			priv->txpwrlmt_file = NULL;
 			return -EIO;
 		}
 
 		mutex_unlock(&priv->fwcmd_mutex);
 	}
-
-	release_firmware(priv->txpwrlmt_file);
-	priv->txpwrlmt_file = NULL;
 
 	return 0;
 }

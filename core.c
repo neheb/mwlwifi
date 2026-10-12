@@ -172,6 +172,45 @@ err:
 	return -EIO;
 }
 
+/* Calibration and tx power limit data are board specific. Look for
+ * "<name>.<board>.<ext>" first, with the board taken from the device tree
+ * root compatible ('/' replaced by '_'), then fall back to "<name>.<ext>".
+ * Both are optional, so don't warn or wait for userspace when missing.
+ */
+static int mwl_request_board_file(struct mwl_priv *priv,
+				  const struct firmware **fw, const char *name)
+{
+	struct device_node *root;
+	const char *board = NULL;
+	const char *ext;
+	char *board_name;
+	int rc = -ENOENT;
+
+	root = of_find_node_by_path("/");
+	if (root) {
+		of_property_read_string_index(root, "compatible", 0, &board);
+		of_node_put(root);
+	}
+
+	ext = strrchr(name, '.');
+	if (board && ext) {
+		board_name = kasprintf(GFP_KERNEL, "%.*s.%s%s",
+				       (int)(ext - name), name, board, ext);
+		if (!board_name)
+			return -ENOMEM;
+		strreplace(board_name + (ext - name) + 1, '/', '_');
+		rc = firmware_request_nowarn(fw, board_name, priv->dev);
+		if (!rc)
+			wiphy_info(priv->hw->wiphy, "using %s\n", board_name);
+		kfree(board_name);
+	}
+
+	if (rc)
+		rc = firmware_request_nowarn(fw, name, priv->dev);
+
+	return rc;
+}
+
 static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name,
 			     const char *cal_name, const char *txpwrlmt_name)
 {
@@ -193,20 +232,16 @@ static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name,
 		goto err_download_fw;
 	}
 
-	if (cal_name) {
-		if ((request_firmware((const struct firmware **)&priv->cal_data,
-		     cal_name, priv->dev)) < 0)
-			wiphy_debug(priv->hw->wiphy,
-				    "cannot find calibtration data\n");
-	}
+	if (cal_name &&
+	    mwl_request_board_file(priv, (const struct firmware **)&priv->cal_data,
+				   cal_name))
+		wiphy_debug(priv->hw->wiphy, "no calibration data\n");
 
-	if (txpwrlmt_name) {
-		if ((request_firmware(
-		     (const struct firmware **)&priv->txpwrlmt_file,
-		     txpwrlmt_name, priv->dev)) < 0)
-			wiphy_debug(priv->hw->wiphy,
-				    "cannot find tx power limit data\n");
-	}
+	if (txpwrlmt_name &&
+	    mwl_request_board_file(priv,
+				   (const struct firmware **)&priv->txpwrlmt_file,
+				   txpwrlmt_name))
+		wiphy_debug(priv->hw->wiphy, "no tx power limit data\n");
 
 	return rc;
 
@@ -1080,6 +1115,13 @@ int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name,
 	mwl_process_of_dts(priv);
 
 	rc = mwl_wl_init(priv);
+
+	/* only needed during mwl_wl_init() */
+	release_firmware(priv->cal_data);
+	priv->cal_data = NULL;
+	release_firmware(priv->txpwrlmt_file);
+	priv->txpwrlmt_file = NULL;
+
 	if (rc) {
 		wiphy_err(hw->wiphy, "fail to initialize wireless lan\n");
 		return -EIO;
