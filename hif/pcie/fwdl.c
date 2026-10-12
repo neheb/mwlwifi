@@ -235,7 +235,7 @@ int pcie_download_firmware(struct ieee80211_hw *hw)
 		    "FwSize = %d downloaded Size = %d curr_iteration %d\n",
 		    (int)fw->size, size_fw_downloaded, curr_iteration);
 
-	/* Now firware is downloaded successfully, so this part is to check
+	/* Now firmware is downloaded successfully, so this part is to check
 	 * whether fw can properly execute to an extent that write back
 	 * signature to indicate its readiness to the host. NOTE: if your
 	 * downloaded fw crashes, this signature checking will fail. This

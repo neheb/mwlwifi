@@ -85,7 +85,7 @@ static ssize_t mwl_thermal_show_temp(struct device *dev,
 
 	temperature = priv->temperature;
 
-	/* display in millidegree celcius */
+	/* display in millidegrees Celsius */
 	ret = snprintf(buf, PAGE_SIZE, "%d\n", temperature * 1000);
 out:
 	return ret;

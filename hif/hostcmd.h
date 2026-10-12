@@ -1055,7 +1055,7 @@ struct hostcmd_cmd_set_bftype {
 /* HOSTCMD_CMD_GET_TEMP */
 struct hostcmd_cmd_get_temp {
 	struct hostcmd_header cmd_hdr;
-	__le32 celcius;
+	__le32 temperature;
 	__le32 raw_data;
 } __packed;
 

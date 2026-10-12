@@ -3291,7 +3291,7 @@ int mwl_fwcmd_get_temp(struct ieee80211_hw *hw, u32 *temp)
 		return -EIO;
 	}
 
-	*temp = le32_to_cpu(pcmd->celcius);
+	*temp = le32_to_cpu(pcmd->temperature);
 
 	mutex_unlock(&priv->fwcmd_mutex);
 
