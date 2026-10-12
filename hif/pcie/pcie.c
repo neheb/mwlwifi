@@ -21,7 +21,6 @@
 #include "sysadpt.h"
 #include "core.h"
 #include "utils.h"
-#include "vendor_cmd.h"
 #include "hif/fwcmd.h"
 #include "hif/pcie/dev.h"
 #include "hif/pcie/fwdl.h"
@@ -478,10 +477,6 @@ static int pcie_exec_cmd(struct ieee80211_hw *hw, unsigned short cmd)
 			wiphy_err(priv->hw->wiphy, "timeout: 0x%04x\n", cmd);
 			priv->in_send_cmd = false;
 			priv->cmd_timeout = true;
-			if (priv->heartbeat)
-				vendor_cmd_basic_event(
-					hw->wiphy,
-					MWL_VENDOR_EVENT_CMD_TIMEOUT);
 			return -EIO;
 		}
 	} else {
@@ -1703,8 +1698,6 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (rc)
 		goto err_wl_init;
 
-	vendor_cmd_basic_event(hw->wiphy, MWL_VENDOR_EVENT_DRIVER_READY);
-
 	return rc;
 
 err_wl_init:
@@ -1731,7 +1724,6 @@ static void pcie_remove(struct pci_dev *pdev)
 	priv->rmmod = true;
 	while (priv->in_send_cmd)
 		usleep_range(1000, 2000);
-	vendor_cmd_basic_event(hw->wiphy, MWL_VENDOR_EVENT_DRIVER_START_REMOVE);
 	mwl_deinit_hw(hw);
 	pci_set_drvdata(pdev, NULL);
 	mwl_free_hw(hw);
