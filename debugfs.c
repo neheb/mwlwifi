@@ -1697,38 +1697,23 @@ static ssize_t mwl_debugfs_ba_hist_read(struct file *file, char __user *ubuf,
 					size_t count, loff_t *ppos)
 {
 	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
-	unsigned long page = get_zeroed_page(GFP_KERNEL);
-	char *p = (char *)page;
-	int len = 0, size = PAGE_SIZE;
+	/* header and summary lines, plus one 36 byte line per entry */
+	size_t size = 256 + ACNT_BA_SIZE * 36;
+	char *p;
+	int len = 0;
 	struct mwl_sta *sta_info;
 	struct mwl_tx_ba_stats *ba_stats;
 	u32 i, data;
 	u32 baholecnt, baexpcnt, bmap0cnt, nobacnt;
 	u8 bmap0flag, nobaflag;
-	char buff[500], file_location[20];
-	struct file *filp_bahisto;
-	u8 *data_p = buff;
 	ssize_t ret;
 
+	if (!priv->ba_aid)
+		return -EINVAL;
+
+	p = kvzalloc(size, GFP_KERNEL);
 	if (!p)
 		return -ENOMEM;
-
-	if (!priv->ba_aid) {
-		ret = -EINVAL;
-		goto err;
-	}
-
-	memset(buff, 0, sizeof(buff));
-	memset(file_location, 0, sizeof(file_location));
-	sprintf(file_location, "/tmp/ba_histo-%d", priv->ba_aid);
-
-	filp_bahisto = filp_open(file_location,
-				 O_RDWR | O_CREAT | O_TRUNC, 0);
-
-	if (IS_ERR(filp_bahisto)) {
-		ret = -EIO;
-		goto err;
-	}
 
 	sta_info = utils_find_sta_by_aid(priv, priv->ba_aid);
 	if (sta_info && sta_info->ba_hist.enable &&
@@ -1738,18 +1723,13 @@ static ssize_t mwl_debugfs_ba_hist_read(struct file *file, char __user *ubuf,
 				 "BA histogram aid: %d, stnid: %d type: %s\n",
 				 priv->ba_aid, sta_info->stnid,
 				 sta_info->ba_hist.type ? "MU" : "SU");
-		data_p += sprintf(data_p,
-				  "BA histogram aid: %d, stnid: %d type: %s\n",
-				  priv->ba_aid, sta_info->stnid,
-				  sta_info->ba_hist.type ? "MU" : "SU");
-		data_p += sprintf(data_p, "%8s,%8s,%8s,%8s\n",
-				  "BAhole", "Expect", "Bmap0", "NoBA");
-		data = *(u32 *)&ba_stats[0];
+		len += scnprintf(p + len, size - len, "%8s,%8s,%8s,%8s\n",
+				 "BAhole", "Expect", "Bmap0", "NoBA");
 		baholecnt = 0;
 		baexpcnt = 0;
 		bmap0cnt = 0;
 		nobacnt = 0;
-		for (i = 0; i < ACNT_BA_SIZE && data; i++) {
+		for (i = 0; i < ACNT_BA_SIZE; i++) {
 			data = *(u32 *)&ba_stats[i];
 			if (data == 0)
 				break;
@@ -1764,52 +1744,42 @@ static ssize_t mwl_debugfs_ba_hist_read(struct file *file, char __user *ubuf,
 				bmap0flag = 0;
 			nobaflag = ba_stats[i].no_ba;
 
-			/* Buffer is full. Write to file and reset buf */
-			if ((strlen(buff) + 36) >= 500) {
-				__kernel_write(filp_bahisto, buff, strlen(buff),
-					       &filp_bahisto->f_pos);
-				mdelay(2);
-				memset(buff, 0, sizeof(buff));
-				data_p = buff;
-			}
-
-			data_p += sprintf(data_p, "%8d,%8d,",
-					  ba_stats[i].ba_hole,
-					  ba_stats[i].ba_expected);
+			len += scnprintf(p + len, size - len, "%8d,%8d,",
+					 ba_stats[i].ba_hole,
+					 ba_stats[i].ba_expected);
 
 			baholecnt += ba_stats[i].ba_hole;
 			baexpcnt += ba_stats[i].ba_expected;
 			if (bmap0flag) {
-				data_p += sprintf(data_p, "       #,");
+				len += scnprintf(p + len, size - len,
+						 "       #,");
 				bmap0cnt++;
-			} else
-				data_p += sprintf(data_p, "%8d,", bmap0flag);
+			} else {
+				len += scnprintf(p + len, size - len, "%8d,",
+						 bmap0flag);
+			}
 			if (nobaflag) {
-				data_p += sprintf(data_p, "       *\n");
+				len += scnprintf(p + len, size - len,
+						 "       *\n");
 				nobacnt++;
-			} else
-				data_p += sprintf(data_p, "%8d\n", nobaflag);
+			} else {
+				len += scnprintf(p + len, size - len, "%8d\n",
+						 nobaflag);
+			}
 		}
 
-		__kernel_write(filp_bahisto, buff, strlen(buff),
-			       &filp_bahisto->f_pos);
 		len += scnprintf(p + len, size - len,
 				 "hole: %d, expect: %d, bmap0: %d, noba: %d\n",
 				 baholecnt, baexpcnt, bmap0cnt, nobacnt);
-		len += scnprintf(p + len, size - len,
-				 "BA histogram data written to %s\n",
-				 file_location);
-	} else
+	} else {
 		len += scnprintf(p + len, size - len,
 				 "No BA histogram for sta aid: %d\n",
 				 priv->ba_aid);
-
-	filp_close(filp_bahisto, current->files);
+	}
 
 	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
 
-err:
-	free_page(page);
+	kvfree(p);
 	return ret;
 }
 
