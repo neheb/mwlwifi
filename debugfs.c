@@ -16,6 +16,7 @@
 /* Description:  This file implements debug fs related functions. */
 
 #include <linux/debugfs.h>
+#include <linux/devcoredump.h>
 #include <linux/etherdevice.h>
 
 #include "sysadpt.h"
@@ -275,56 +276,6 @@ static void dump_tx_hist(char *p, int size, int *len, struct mwl_sta *sta_info)
 					  "  TOTAL              : %10u\n\n",
 					  total);
 	}
-}
-
-static void core_dump_file(u8 *valbuf, u32 length, u32 region, u32 address,
-			   u32 append, u32 totallen, bool textmode)
-{
-	struct file *filp_core = NULL;
-	char file_name[40];
-	u8 *buf = kmalloc(length * 3, GFP_KERNEL);
-	u8 *data_p = buf;
-	u32 i, j = 0;
-
-	if (!buf)
-		return;
-
-	memset(file_name, 0, sizeof(file_name));
-	sprintf(file_name, "/dev/shm/coredump-%x-%x",
-		region, (region + totallen));
-
-	if (append)
-		filp_core = filp_open(file_name, O_RDWR | O_APPEND, 0);
-	else
-		filp_core = filp_open(file_name, O_RDWR | O_CREAT | O_TRUNC, 0);
-
-	if (!IS_ERR(filp_core)) {
-		if (textmode) {
-			for (i = 0; i < length; i += 4) {
-				u32 val = 0;
-
-				val = le32_to_cpu(*(__le32 *)(&valbuf[i]));
-
-				if (i % 16 == 0) {
-					sprintf(buf + j, "\n0x%08x",
-						(int)(address + i));
-					j = strlen(buf);
-				}
-				sprintf(buf + j, "  %08x", val);
-				j = strlen(buf);
-			}
-			data_p = buf + j;
-			data_p += sprintf(data_p, "\n");
-			__kernel_write(filp_core, buf, strlen(buf),
-				       &filp_core->f_pos);
-		} else
-			__kernel_write(filp_core, valbuf, length,
-				       &filp_core->f_pos);
-
-		filp_close(filp_core, current->files);
-	}
-
-	kfree(buf);
 }
 
 static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
@@ -1906,17 +1857,26 @@ err:
 	return ret;
 }
 
+/* Upper bound on the dump size, in case the firmware reports nonsense */
+#define MWL_COREDUMP_MAX_SIZE (16 * 1024 * 1024)
+
+/* Collect the firmware memory regions and hand them to devcoredump. The
+ * dump is the struct coredump header followed by each region's contents
+ * in order. The read returns a summary of the regions.
+ */
 static ssize_t mwl_debugfs_core_dump_read(struct file *file, char __user *ubuf,
 					  size_t count, loff_t *ppos)
 {
 	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
-	unsigned long page = get_zeroed_page(GFP_KERNEL);
-	char *p = (char *)page;
+	unsigned long page;
+	char *p;
 	int len = 0, size = PAGE_SIZE;
 	struct coredump_cmd *core_dump = NULL;
 	struct coredump *cd = NULL;
-	char  *buff = NULL;
-	u32 i, offset;
+	char *buff = NULL;
+	u8 *dump = NULL;
+	size_t dump_size, pos;
+	u32 i, offset, chunk;
 	u32 address, length;
 	ssize_t ret;
 
@@ -1924,38 +1884,51 @@ static ssize_t mwl_debugfs_core_dump_read(struct file *file, char __user *ubuf,
 		return -EPERM;
 
 	if (*ppos)
-		return len;
+		return 0;
 
-	if (!p)
+	page = get_zeroed_page(GFP_KERNEL);
+	if (!page)
 		return -ENOMEM;
+	p = (char *)page;
 
-	core_dump = kmalloc(sizeof(*core_dump), GFP_ATOMIC);
-	if (!core_dump) {
+	core_dump = kzalloc_obj(*core_dump);
+	buff = kzalloc(MAX_CORE_DUMP_BUFFER, GFP_KERNEL);
+	cd = kmalloc_obj(*cd);
+	if (!core_dump || !buff || !cd) {
 		ret = -ENOMEM;
 		goto err;
 	}
 
-	buff = kmalloc(MAX_CORE_DUMP_BUFFER, GFP_ATOMIC);
-	if (!buff) {
-		ret = -ENOMEM;
-		goto err;
-	}
-	memset((char *)buff, 0, MAX_CORE_DUMP_BUFFER);
-
-	cd = kmalloc(sizeof(*cd), GFP_ATOMIC);
-	if (!cd) {
-		ret = -ENOMEM;
-		goto err;
-	}
-
-	core_dump->context = 0;
-	core_dump->flags = 0;
-	core_dump->size_kb = 0;
 	if (mwl_fwcmd_get_fw_core_dump(priv->hw, core_dump, buff)) {
 		ret = -EIO;
 		goto err;
 	}
 	memcpy(cd, buff, sizeof(*cd));
+
+	if (cd->num_regions > MAX_CORE_REGIONS) {
+		wiphy_err(priv->hw->wiphy, "core dump: %d regions\n",
+			  cd->num_regions);
+		ret = -EIO;
+		goto err;
+	}
+
+	dump_size = sizeof(*cd);
+	for (i = 0; i < cd->num_regions; i++)
+		dump_size += le32_to_cpu(cd->region[i].length);
+	if (dump_size > MWL_COREDUMP_MAX_SIZE) {
+		wiphy_err(priv->hw->wiphy, "core dump: size %zu too large\n",
+			  dump_size);
+		ret = -EIO;
+		goto err;
+	}
+
+	dump = vzalloc(dump_size);
+	if (!dump) {
+		ret = -ENOMEM;
+		goto err;
+	}
+	memcpy(dump, cd, sizeof(*cd));
+	pos = sizeof(*cd);
 
 	len += scnprintf(p + len, size - len, "Major Version : %d\n",
 			 cd->version_major);
@@ -1986,11 +1959,19 @@ static ssize_t mwl_debugfs_core_dump_read(struct file *file, char __user *ubuf,
 					   "region:%d offset:%x\n", i, offset);
 				break;
 			}
-			core_dump_file(buff, MAX_CORE_DUMP_BUFFER,
-				       address, address + offset,
-				       offset, length, priv->coredump_text);
+			chunk = min_t(u32, length - offset,
+				      MAX_CORE_DUMP_BUFFER);
+			memcpy(dump + pos + offset, buff, chunk);
 		}
+		pos += length;
 	}
+
+	/* devcoredump takes ownership of the buffer */
+	dev_coredumpv(wiphy_dev(priv->hw->wiphy), dump, dump_size,
+		      GFP_KERNEL);
+	len += scnprintf(p + len, size - len,
+			 "\nDump of %zu bytes available through devcoredump\n",
+			 dump_size);
 
 	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
 
@@ -2024,21 +2005,15 @@ static ssize_t mwl_debugfs_core_dump_write(struct file *file,
 		goto err;
 	}
 
-	if (kstrtoint(buf, 0, &text_mode)) {
-		ret = -EINVAL;
-		goto err;
-	}
-
-	if ((text_mode < 0) || (text_mode > 1)) {
-		wiphy_warn(priv->hw->wiphy,
-			   "text mode should be 0 (false) or 1 (true): %d\n",
-			   text_mode);
+	/* The dump used to be written to /dev/shm in text or binary form;
+	 * it now goes through devcoredump, so the value is only validated.
+	 */
+	if (kstrtoint(buf, 0, &text_mode) || text_mode < 0 || text_mode > 1) {
 		ret = -EINVAL;
 		goto err;
 	}
 
 	mwl_fwcmd_core_dump_diag_mode(priv->hw, 1);
-	priv->coredump_text = text_mode ? true : false;
 	ret = count;
 
 err:

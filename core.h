@@ -351,7 +351,6 @@ struct mwl_priv {
 	int ra_aid;
 	int ba_aid;
 	int fixed_rate;
-	bool coredump_text;
 	u32 ra_tx_attempt[2][6];
 
 	bool debug_ampdu;
