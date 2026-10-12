@@ -238,6 +238,52 @@ static u8 mwl_fwcmd_get_pri_chnl_idx(const struct cfg80211_chan_def *chandef)
 	return (chandef->chan->center_freq - lowest) / 20;
 }
 
+/* The firmware builds the beacon itself out of what HOSTCMD_CMD_SET_IES and
+ * HOSTCMD_CMD_AP_BEACON give it, rather than transmitting the template that
+ * mac80211 hands us. HT/VHT elements, RSN/WPA, rates, country and so on each
+ * go into dedicated fields of those commands, so they have to be picked out
+ * of the template here. The firmware generates SSID, DS parameters, TIM, ERP
+ * and the channel switch related elements on its own.
+ *
+ * Anything else (elements added by newer hostapd features, vendor elements
+ * and so on) goes into the proprietary element list, which the firmware
+ * copies into the beacon as is. That list has a fixed size, so elements that
+ * do not fit are dropped with a warning instead of silently.
+ */
+static bool mwl_fwcmd_ie_is_fw_generated(u8 id)
+{
+	switch (id) {
+	case WLAN_EID_SSID:
+	case WLAN_EID_DS_PARAMS:
+	case WLAN_EID_TIM:
+	case WLAN_EID_IBSS_PARAMS:
+	case WLAN_EID_TPC_REPORT:
+	case WLAN_EID_CHANNEL_SWITCH:
+	case WLAN_EID_QUIET:
+	case WLAN_EID_ERP_INFO:
+	case WLAN_EID_EXT_CHANSWITCH_ANN:
+	case WLAN_EID_SECONDARY_CHANNEL_OFFSET:
+	case WLAN_EID_WIDE_BW_CHANNEL_SWITCH:
+	case WLAN_EID_CHANNEL_SWITCH_WRAPPER:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static void mwl_fwcmd_add_other_ie(struct beacon_info *beacon_info,
+				   const u8 *ie, u16 len)
+{
+	if (beacon_info->ie_other_len + len >
+	    sizeof(beacon_info->ie_list_other)) {
+		beacon_info->ie_other_dropped = true;
+		return;
+	}
+
+	memcpy(beacon_info->ie_list_other + beacon_info->ie_other_len, ie, len);
+	beacon_info->ie_other_len += len;
+}
+
 static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 				   struct mwl_vif *vif, u8 *beacon, int len)
 {
@@ -383,8 +429,11 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 			break;
 		case WLAN_EID_VENDOR_SPECIFIC:
 			if (elen < 4 ||
-			    get_unaligned_be24(pos) != WLAN_OUI_MICROSOFT)
+			    get_unaligned_be24(pos) != WLAN_OUI_MICROSOFT) {
+				mwl_fwcmd_add_other_ie(beacon_info, pos - 2,
+						       elen + 2);
 				break;
+			}
 
 			switch (pos[3]) {
 			case WLAN_OUI_TYPE_MICROSOFT_WPA:
@@ -399,9 +448,16 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 				beacon_info->ie_wsc_len = (elen + 2);
 				beacon_info->ie_wsc_ptr = (pos - 2);
 				break;
+			default:
+				mwl_fwcmd_add_other_ie(beacon_info, pos - 2,
+						       elen + 2);
+				break;
 			}
 			break;
 		default:
+			if (!mwl_fwcmd_ie_is_fw_generated(id))
+				mwl_fwcmd_add_other_ie(beacon_info, pos - 2,
+						       elen + 2);
 			break;
 		}
 
@@ -416,11 +472,25 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 	}
 }
 
+static bool mwl_fwcmd_append_ie(struct hostcmd_cmd_set_ies *pcmd, u16 *len,
+				const u8 *ie, u16 ie_len)
+{
+	if (*len + ie_len > sizeof(pcmd->ie_list_proprietary))
+		return false;
+
+	if (ie_len)
+		memcpy(pcmd->ie_list_proprietary + *len, ie, ie_len);
+	*len += ie_len;
+
+	return true;
+}
+
 static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 {
 	struct hostcmd_cmd_set_ies *pcmd;
 	struct beacon_info *beacon = &mwl_vif->beacon_info;
-	u16 ie_list_len_proprietary = 0;
+	u16 ie_len = 0, off, elem_len;
+	bool ok = true;
 
 	if (beacon->ie_ht_len > sizeof(pcmd->ie_list_ht))
 		goto einval;
@@ -445,36 +515,35 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 	memcpy(pcmd->ie_list_vht, beacon->ie_vht_ptr, beacon->ie_vht_len);
 	pcmd->ie_list_len_vht = cpu_to_le16(beacon->ie_vht_len);
 
-	memcpy(pcmd->ie_list_proprietary, beacon->ie_meshid_ptr,
-	       beacon->ie_meshid_len);
-	ie_list_len_proprietary = beacon->ie_meshid_len;
-
-	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
-	       beacon->ie_meshcfg_ptr, beacon->ie_meshcfg_len);
-	ie_list_len_proprietary += beacon->ie_meshcfg_len;
-
-	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
-	       beacon->ie_meshchsw_ptr, beacon->ie_meshchsw_len);
-	ie_list_len_proprietary += beacon->ie_meshchsw_len;
-
-	if (priv->chip_type == MWL8897) {
-		memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
-		       beacon->ie_wmm_ptr, beacon->ie_wmm_len);
-		ie_list_len_proprietary += mwl_vif->beacon_info.ie_wmm_len;
+	ok &= mwl_fwcmd_append_ie(pcmd, &ie_len, beacon->ie_meshid_ptr,
+				  beacon->ie_meshid_len);
+	ok &= mwl_fwcmd_append_ie(pcmd, &ie_len, beacon->ie_meshcfg_ptr,
+				  beacon->ie_meshcfg_len);
+	ok &= mwl_fwcmd_append_ie(pcmd, &ie_len, beacon->ie_meshchsw_ptr,
+				  beacon->ie_meshchsw_len);
+	if (priv->chip_type == MWL8897)
+		ok &= mwl_fwcmd_append_ie(pcmd, &ie_len, beacon->ie_wmm_ptr,
+					  beacon->ie_wmm_len);
+	ok &= mwl_fwcmd_append_ie(pcmd, &ie_len, beacon->ie_mde_ptr,
+				  beacon->ie_mde_len);
+	ok &= mwl_fwcmd_append_ie(pcmd, &ie_len, beacon->ie_rsnx_ptr,
+				  beacon->ie_rsnx_len);
+	/* Append the remaining elements one at a time, so that the ones
+	 * that still fit after the above make it into the beacon.
+	 */
+	for (off = 0; off < beacon->ie_other_len; off += elem_len) {
+		elem_len = 2 + beacon->ie_list_other[off + 1];
+		ok &= mwl_fwcmd_append_ie(pcmd, &ie_len,
+					  beacon->ie_list_other + off,
+					  elem_len);
 	}
 
-	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
-	       beacon->ie_mde_ptr, beacon->ie_mde_len);
-	ie_list_len_proprietary += mwl_vif->beacon_info.ie_mde_len;
+	if (!ok || beacon->ie_other_dropped)
+		wiphy_warn_ratelimited(priv->hw->wiphy,
+				       "beacon elements exceed firmware limit of %zu bytes, some were dropped\n",
+				       sizeof(pcmd->ie_list_proprietary));
 
-	if (ie_list_len_proprietary + beacon->ie_rsnx_len <=
-	    sizeof(pcmd->ie_list_proprietary)) {
-		memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
-		       beacon->ie_rsnx_ptr, beacon->ie_rsnx_len);
-		ie_list_len_proprietary += beacon->ie_rsnx_len;
-	}
-
-	pcmd->ie_list_len_proprietary = cpu_to_le16(ie_list_len_proprietary);
+	pcmd->ie_list_len_proprietary = cpu_to_le16(ie_len);
 
 	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_IES)) {
 		mutex_unlock(&priv->fwcmd_mutex);

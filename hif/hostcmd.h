@@ -542,7 +542,7 @@ struct hostcmd_cmd_set_ies {
 	/*Buffer size same as Generic_Beacon*/
 	u8 ie_list_ht[148];
 	u8 ie_list_vht[24];
-	u8 ie_list_proprietary[112];
+	u8 ie_list_proprietary[MWL_IE_LIST_PROPRIETARY_LEN];
 } __packed;
 
 /* HOSTCMD_CMD_SET_LINKADAPT_CS_MODE */

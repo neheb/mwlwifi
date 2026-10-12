@@ -362,6 +362,9 @@ struct mwl_priv {
 	u32 feature;
 };
 
+/* Size of the firmware's SET_IES proprietary element buffer */
+#define MWL_IE_LIST_PROPRIETARY_LEN 112
+
 struct beacon_info {
 	bool valid;
 	u16 cap_info;
@@ -394,6 +397,10 @@ struct beacon_info {
 	u8 ie_meshid_len;
 	u8 ie_meshcfg_len;
 	u8 ie_meshchsw_len;
+	/* Elements not handled above, passed through to the firmware */
+	u8 ie_list_other[MWL_IE_LIST_PROPRIETARY_LEN];
+	u8 ie_other_len;
+	bool ie_other_dropped;
 };
 
 struct mwl_vif {
