@@ -19,6 +19,7 @@
 
 #include <linux/etherdevice.h>
 #include <linux/ctype.h>
+#include <linux/hex.h>
 #include <linux/unaligned.h>
 
 #include "sysadpt.h"
@@ -796,68 +797,36 @@ static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
 	return 0;
 }
 
-static __le16 mwl_fwcmd_parse_cal_cfg(const u8 *src, size_t len, u8 *dst)
+/* Parse a text file of hex byte pairs, skipping whitespace and other
+ * non-hex characters, into at most max bytes at dst. Returns the number
+ * of bytes produced, or -EINVAL for a dangling or malformed pair. The
+ * number of source characters consumed is stored in *consumed.
+ */
+static int mwl_fwcmd_parse_hex(const u8 *src, size_t len, u8 *dst,
+			       size_t max, size_t *consumed)
 {
-	const u8 *ptr;
-	u8 *dptr;
-	char byte_str[3];
-	long res;
+	const u8 *ptr = src, *end = src + len;
+	size_t n = 0;
+	int hi, lo;
 
-	ptr = src;
-	dptr = dst;
-	byte_str[2] = '\0';
-
-	while (ptr - src < len) {
-		if (*ptr && (isspace(*ptr) || iscntrl(*ptr))) {
+	while (ptr < end && n < max) {
+		if (!isxdigit(*ptr)) {
 			ptr++;
 			continue;
 		}
 
-		if (isxdigit(*ptr)) {
-			byte_str[0] = *ptr++;
-			byte_str[1] = *ptr++;
-			if (kstrtol(byte_str, 16, &res))
-				return -EINVAL;
-			*dptr++ = res;
-		} else {
-			ptr++;
-		}
+		if (end - ptr < 2)
+			return -EINVAL;
+		hi = hex_to_bin(ptr[0]);
+		lo = hex_to_bin(ptr[1]);
+		if (lo < 0)
+			return -EINVAL;
+		dst[n++] = (hi << 4) | lo;
+		ptr += 2;
 	}
 
-	return cpu_to_le16(dptr - dst);
-}
-
-static u16 mwl_fwcmd_parse_txpwrlmt_cfg(const u8 *src, size_t len,
-					u16 parse_len, u8 *dst)
-{
-	const u8 *ptr;
-	u8 *dptr;
-	char byte_str[3];
-	long res;
-
-	ptr = src;
-	dptr = dst;
-	byte_str[2] = '\0';
-
-	while ((ptr - src < len) && (dptr - dst < parse_len)) {
-		if (*ptr && (isspace(*ptr) || iscntrl(*ptr))) {
-			ptr++;
-			continue;
-		}
-
-		if (isxdigit(*ptr)) {
-			byte_str[0] = *ptr++;
-			byte_str[1] = *ptr++;
-			if (kstrtol(byte_str, 16, &res)) {
-				return -EINVAL;
-			}
-			*dptr++ = res;
-		} else {
-			ptr++;
-		}
-	}
-
-	return (ptr - src);
+	*consumed = ptr - src;
+	return n;
 }
 
 const struct hostcmd_get_hw_spec
@@ -1415,7 +1384,10 @@ int mwl_fwcmd_set_cfg_data(struct ieee80211_hw *hw, u16 type)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_cfg *pcmd;
-	u16 parsed_len;
+	size_t max = MWL_CMD_BUF_SIZE - offsetof(typeof(*pcmd), data);
+	size_t consumed;
+	int parsed_len;
+
 	if (!priv->cal_data)
 		return 0;
 
@@ -1424,14 +1396,16 @@ int mwl_fwcmd_set_cfg_data(struct ieee80211_hw *hw, u16 type)
 	mutex_lock(&priv->fwcmd_mutex);
 
 	memset(pcmd, 0x00, sizeof(*pcmd));
-	parsed_len = mwl_fwcmd_parse_cal_cfg(priv->cal_data->data,
-						 priv->cal_data->size,
-						 pcmd->data);
-	if (parsed_len == -EINVAL) {
+	parsed_len = mwl_fwcmd_parse_hex(priv->cal_data->data,
+					 priv->cal_data->size, pcmd->data,
+					 max, &consumed);
+	if (parsed_len < 0 ||
+	    (parsed_len == max && consumed < priv->cal_data->size)) {
 		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(hw->wiphy, "invalid calibration data\n");
 		return -EIO;
 	}
-	pcmd->data_len = parsed_len;
+	pcmd->data_len = cpu_to_le16(parsed_len);
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_CFG);
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd) +
 		le16_to_cpu(pcmd->data_len) - sizeof(pcmd->data));
@@ -3646,7 +3620,10 @@ int mwl_fwcmd_set_txpwrlmt_cfg_data(struct ieee80211_hw *hw)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_txpwrlmt_cfg *pcmd;
 	struct mwl_txpwrlmt_cfg_entry_hdr hdr;
-	u16 id, parsed_len, size;
+	size_t max = MWL_CMD_BUF_SIZE -
+		     offsetof(struct hostcmd_cmd_txpwrlmt_cfg, data);
+	size_t size, parsed_len;
+	u16 id;
 	__le32 txpwr_cfg_sig;
 	u8 version[TXPWRLMT_CFG_VERSION_INFO_LEN];
 	const u8 *ptr;
@@ -3658,10 +3635,8 @@ int mwl_fwcmd_set_txpwrlmt_cfg_data(struct ieee80211_hw *hw)
 	size = priv->txpwrlmt_file->size;
 
 	/* Parsing TxPwrLmit Conf file Signature */
-	parsed_len = mwl_fwcmd_parse_txpwrlmt_cfg(ptr, size,
-						  TXPWRLMT_CFG_SIG_LEN,
-						  (u8 *)&txpwr_cfg_sig);
-	if (parsed_len == -EINVAL)
+	if (mwl_fwcmd_parse_hex(ptr, size, (u8 *)&txpwr_cfg_sig,
+				TXPWRLMT_CFG_SIG_LEN, &parsed_len) < 0)
 		return -EINVAL;
 
 	ptr += parsed_len;
@@ -3676,10 +3651,8 @@ int mwl_fwcmd_set_txpwrlmt_cfg_data(struct ieee80211_hw *hw)
 	}
 
 	/* Parsing TxPwrLmit Conf file Version */
-	parsed_len = mwl_fwcmd_parse_txpwrlmt_cfg(ptr, size,
-						  TXPWRLMT_CFG_VERSION_INFO_LEN,
-						  version);
-	if (parsed_len == -EINVAL)
+	if (mwl_fwcmd_parse_hex(ptr, size, version,
+				TXPWRLMT_CFG_VERSION_INFO_LEN, &parsed_len) < 0)
 		return -EINVAL;
 
 	ptr += parsed_len;
@@ -3689,17 +3662,18 @@ int mwl_fwcmd_set_txpwrlmt_cfg_data(struct ieee80211_hw *hw)
 		u16 data_len;
 
 		/*Parsing tx pwr cfg subband header info*/
-		parsed_len = sizeof(struct mwl_txpwrlmt_cfg_entry_hdr);
-		parsed_len = mwl_fwcmd_parse_txpwrlmt_cfg(ptr, size,
-							  parsed_len,
-							  (u8 *)&hdr);
-		if (parsed_len == -EINVAL)
+		if (mwl_fwcmd_parse_hex(ptr, size, (u8 *)&hdr, sizeof(hdr),
+					&parsed_len) < 0)
 			return -EINVAL;
 
 		ptr += parsed_len;
 		size -= parsed_len;
-		data_len = le16_to_cpu(hdr.len) -
-			sizeof(struct mwl_txpwrlmt_cfg_entry_hdr);
+		if (le16_to_cpu(hdr.len) < sizeof(hdr) ||
+		    le16_to_cpu(hdr.len) - sizeof(hdr) > max) {
+			wiphy_err(hw->wiphy, "invalid txpwrlmt subband length\n");
+			return -EINVAL;
+		}
+		data_len = le16_to_cpu(hdr.len) - sizeof(hdr);
 
 		pcmd = (struct hostcmd_cmd_txpwrlmt_cfg *)&priv->pcmd_buf[0];
 
@@ -3712,10 +3686,8 @@ int mwl_fwcmd_set_txpwrlmt_cfg_data(struct ieee80211_hw *hw)
 		pcmd->num_entries = hdr.num_entries;
 
 		/* Parsing tx pwr cfg subband header info */
-		parsed_len = mwl_fwcmd_parse_txpwrlmt_cfg(ptr, size,
-							  data_len, pcmd->data);
-
-		if (parsed_len == -EINVAL) {
+		if (mwl_fwcmd_parse_hex(ptr, size, pcmd->data, data_len,
+					&parsed_len) < 0) {
 			mutex_unlock(&priv->fwcmd_mutex);
 			release_firmware(priv->txpwrlmt_file);
 			priv->txpwrlmt_file = NULL;
