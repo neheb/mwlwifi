@@ -2003,12 +2003,25 @@ int mwl_fwcmd_set_beacon(struct ieee80211_hw *hw,
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_vif *mwl_vif;
 	struct beacon_info *b_inf;
+	u8 *data, *old;
 	int rc;
 
 	mwl_vif = mwl_dev_get_vif(vif);
 	b_inf = &mwl_vif->beacon_info;
 
-	mwl_fwcmd_parse_beacon(priv, mwl_vif, beacon, len);
+	/* beacon_info points into the template, and debugfs reads it after
+	 * the caller has freed the skb, so keep a copy for the vif.
+	 */
+	data = kmemdup(beacon, len, GFP_KERNEL);
+	if (!data)
+		return -ENOMEM;
+
+	spin_lock_bh(&priv->vif_lock);
+	old = mwl_vif->beacon_data;
+	mwl_vif->beacon_data = data;
+	mwl_fwcmd_parse_beacon(priv, mwl_vif, data, len);
+	spin_unlock_bh(&priv->vif_lock);
+	kfree(old);
 
 	if (!b_inf->valid)
 		goto err;

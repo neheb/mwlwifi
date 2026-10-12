@@ -420,6 +420,7 @@ struct mwl_vif {
 	bool is_hw_crypto_enabled;
 	/* Indicate if this is station mode */
 	struct beacon_info beacon_info;
+	u8 *beacon_data;             /* copy of the template beacon_info points into */
 	bool set_beacon;
 	int basic_rate_idx;
 	u8 broadcast_ssid;

@@ -211,6 +211,8 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 
 	/* Setup driver private area. */
 	mwl_vif = mwl_dev_get_vif(vif);
+	/* Still set if this is a re-add during hardware restart */
+	kfree(mwl_vif->beacon_data);
 	memset(mwl_vif, 0, sizeof(*mwl_vif));
 	mwl_vif->type = vif->type;
 	mwl_vif->macid = macid;
@@ -286,6 +288,9 @@ static void mwl_mac80211_remove_vif(struct mwl_priv *priv,
 	spin_lock_bh(&priv->vif_lock);
 	list_del(&mwl_vif->list);
 	spin_unlock_bh(&priv->vif_lock);
+
+	kfree(mwl_vif->beacon_data);
+	mwl_vif->beacon_data = NULL;
 }
 
 static void mwl_mac80211_remove_interface(struct ieee80211_hw *hw,
