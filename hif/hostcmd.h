@@ -626,7 +626,8 @@ union phy_params {
 	struct ds_params ds_param_set;
 } __packed;
 
-struct rsn_ie {
+/* WPA vendor IE (00:50:f2 type 1), not the RSN element */
+struct wpa_ie {
 	u8 elem_id;
 	u8 len;
 	u8 oui_type[4];              /* 00:50:f2:01 */
@@ -699,7 +700,7 @@ struct start_cmd {
 	__le16 cap_info;
 	u8 b_rate_set[SYSADPT_MAX_DATA_RATES_G];
 	u8 op_rate_set[SYSADPT_MAX_DATA_RATES_G];
-	struct rsn_ie rsn_ie;
+	struct wpa_ie wpa_ie;
 	struct rsn48_ie rsn48_ie;
 	struct wmm_param_elem wmm_param;
 	struct country country;

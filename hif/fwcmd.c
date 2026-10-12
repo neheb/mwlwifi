@@ -19,6 +19,7 @@
 
 #include <linux/etherdevice.h>
 #include <linux/ctype.h>
+#include <linux/unaligned.h>
 
 #include "sysadpt.h"
 #include "core.h"
@@ -534,22 +535,23 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 			}
 			break;
 		case WLAN_EID_VENDOR_SPECIFIC:
-			if ((pos[0] == 0x00) && (pos[1] == 0x50) &&
-			    (pos[2] == 0xf2)) {
-				if (pos[3] == 0x01) {
-					beacon_info->ie_rsn_len = (elen + 2);
-					beacon_info->ie_rsn_ptr = (pos - 2);
-				}
+			if (elen < 4 ||
+			    get_unaligned_be24(pos) != WLAN_OUI_MICROSOFT)
+				break;
 
-				if (pos[3] == 0x02) {
-					beacon_info->ie_wmm_len = (elen + 2);
-					beacon_info->ie_wmm_ptr = (pos - 2);
-				}
-
-				if (pos[3] == 0x04) {
-					beacon_info->ie_wsc_len = (elen + 2);
-					beacon_info->ie_wsc_ptr = (pos - 2);
-				}
+			switch (pos[3]) {
+			case WLAN_OUI_TYPE_MICROSOFT_WPA:
+				beacon_info->ie_wpa_len = (elen + 2);
+				beacon_info->ie_wpa_ptr = (pos - 2);
+				break;
+			case WLAN_OUI_TYPE_MICROSOFT_WMM:
+				beacon_info->ie_wmm_len = (elen + 2);
+				beacon_info->ie_wmm_ptr = (pos - 2);
+				break;
+			case WLAN_OUI_TYPE_MICROSOFT_WPS:
+				beacon_info->ie_wsc_len = (elen + 2);
+				beacon_info->ie_wsc_ptr = (pos - 2);
+				break;
 			}
 			break;
 		default:
@@ -658,7 +660,7 @@ static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv,
 	    (sizeof(pcmd->start_cmd.wmm_param) + 1))
 		goto ielenerr;
 
-	if (mwl_vif->beacon_info.ie_rsn_len > sizeof(pcmd->start_cmd.rsn_ie))
+	if (mwl_vif->beacon_info.ie_wpa_len > sizeof(pcmd->start_cmd.wpa_ie))
 		goto ielenerr;
 
 	if (mwl_vif->beacon_info.ie_rsn48_len >
@@ -693,8 +695,8 @@ static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv,
 	memcpy(&pcmd->start_cmd.wmm_param, mwl_vif->beacon_info.ie_wmm_ptr,
 	       mwl_vif->beacon_info.ie_wmm_len);
 
-	memcpy(&pcmd->start_cmd.rsn_ie, mwl_vif->beacon_info.ie_rsn_ptr,
-	       mwl_vif->beacon_info.ie_rsn_len);
+	memcpy(&pcmd->start_cmd.wpa_ie, mwl_vif->beacon_info.ie_wpa_ptr,
+	       mwl_vif->beacon_info.ie_wpa_len);
 
 	memcpy(&pcmd->start_cmd.rsn48_ie, mwl_vif->beacon_info.ie_rsn48_ptr,
 	       mwl_vif->beacon_info.ie_rsn48_len);
