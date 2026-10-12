@@ -967,7 +967,7 @@ static void mwl_wl_deinit(struct mwl_priv *priv)
 {
 	struct ieee80211_hw *hw = priv->hw;
 
-	timer_delete_sync(&priv->period_timer);
+	timer_shutdown_sync(&priv->period_timer);
 
 	if (priv->irq != -1) {
 		free_irq(priv->irq, hw);
