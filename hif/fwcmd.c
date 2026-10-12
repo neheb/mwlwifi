@@ -227,168 +227,15 @@ static int mwl_fwcmd_set_tx_powers(struct mwl_priv *priv, u16 txpow[],
 	return 0;
 }
 
-static u8 mwl_fwcmd_get_80m_pri_chnl(u8 channel)
+/* Index of the primary 20 MHz channel within the operating channel,
+ * counted from the lowest 20 MHz subchannel, as the firmware expects.
+ */
+static u8 mwl_fwcmd_get_pri_chnl_idx(const struct cfg80211_chan_def *chandef)
 {
-	u8 act_primary = ACT_PRIMARY_CHAN_0;
+	int width = cfg80211_chandef_get_width(chandef);
+	u32 lowest = chandef->center_freq1 - width / 2 + 10;
 
-	switch (channel) {
-	case 36:
-		act_primary = ACT_PRIMARY_CHAN_0;
-		break;
-	case 40:
-		act_primary = ACT_PRIMARY_CHAN_1;
-		break;
-	case 44:
-		act_primary = ACT_PRIMARY_CHAN_2;
-		break;
-	case 48:
-		act_primary = ACT_PRIMARY_CHAN_3;
-		break;
-	case 52:
-		act_primary = ACT_PRIMARY_CHAN_0;
-		break;
-	case 56:
-		act_primary = ACT_PRIMARY_CHAN_1;
-		break;
-	case 60:
-		act_primary = ACT_PRIMARY_CHAN_2;
-		break;
-	case 64:
-		act_primary = ACT_PRIMARY_CHAN_3;
-		break;
-	case 100:
-		act_primary = ACT_PRIMARY_CHAN_0;
-		break;
-	case 104:
-		act_primary = ACT_PRIMARY_CHAN_1;
-		break;
-	case 108:
-		act_primary = ACT_PRIMARY_CHAN_2;
-		break;
-	case 112:
-		act_primary = ACT_PRIMARY_CHAN_3;
-		break;
-	case 116:
-		act_primary = ACT_PRIMARY_CHAN_0;
-		break;
-	case 120:
-		act_primary = ACT_PRIMARY_CHAN_1;
-		break;
-	case 124:
-		act_primary = ACT_PRIMARY_CHAN_2;
-		break;
-	case 128:
-		act_primary = ACT_PRIMARY_CHAN_3;
-		break;
-	case 132:
-		act_primary = ACT_PRIMARY_CHAN_0;
-		break;
-	case 136:
-		act_primary = ACT_PRIMARY_CHAN_1;
-		break;
-	case 140:
-		act_primary = ACT_PRIMARY_CHAN_2;
-		break;
-	case 144:
-		act_primary = ACT_PRIMARY_CHAN_3;
-		break;
-	case 149:
-		act_primary = ACT_PRIMARY_CHAN_0;
-		break;
-	case 153:
-		act_primary = ACT_PRIMARY_CHAN_1;
-		break;
-	case 157:
-		act_primary = ACT_PRIMARY_CHAN_2;
-		break;
-	case 161:
-		act_primary = ACT_PRIMARY_CHAN_3;
-		break;
-	}
-
-	return act_primary;
-}
-
-static u8 mwl_fwcmd_get_160m_pri_chnl(u8 channel)
-{
-	u8 act_primary = ACT_PRIMARY_CHAN_0;
-
-	switch (channel) {
-	case 36:
-		act_primary = ACT_PRIMARY_CHAN_0;
-		break;
-	case 40:
-		act_primary = ACT_PRIMARY_CHAN_1;
-		break;
-	case 44:
-		act_primary = ACT_PRIMARY_CHAN_2;
-		break;
-	case 48:
-		act_primary = ACT_PRIMARY_CHAN_3;
-		break;
-	case 52:
-		act_primary = ACT_PRIMARY_CHAN_4;
-		break;
-	case 56:
-		act_primary = ACT_PRIMARY_CHAN_5;
-		break;
-	case 60:
-		act_primary = ACT_PRIMARY_CHAN_6;
-		break;
-	case 64:
-		act_primary = ACT_PRIMARY_CHAN_7;
-		break;
-	case 100:
-		act_primary = ACT_PRIMARY_CHAN_0;
-		break;
-	case 104:
-		act_primary = ACT_PRIMARY_CHAN_1;
-		break;
-	case 108:
-		act_primary = ACT_PRIMARY_CHAN_2;
-		break;
-	case 112:
-		act_primary = ACT_PRIMARY_CHAN_3;
-		break;
-	case 116:
-		act_primary = ACT_PRIMARY_CHAN_4;
-		break;
-	case 120:
-		act_primary = ACT_PRIMARY_CHAN_5;
-		break;
-	case 124:
-		act_primary = ACT_PRIMARY_CHAN_6;
-		break;
-	case 128:
-		act_primary = ACT_PRIMARY_CHAN_7;
-		break;
-	case 149:
-		act_primary = ACT_PRIMARY_CHAN_0;
-		break;
-	case 153:
-		act_primary = ACT_PRIMARY_CHAN_1;
-		break;
-	case 157:
-		act_primary = ACT_PRIMARY_CHAN_2;
-		break;
-	case 161:
-		act_primary = ACT_PRIMARY_CHAN_3;
-		break;
-	case 165:
-		act_primary = ACT_PRIMARY_CHAN_4;
-		break;
-	case 169:
-		act_primary = ACT_PRIMARY_CHAN_5;
-		break;
-	case 173:
-		act_primary = ACT_PRIMARY_CHAN_6;
-		break;
-	case 177:
-		act_primary = ACT_PRIMARY_CHAN_7;
-		break;
-	}
-
-	return act_primary;
+	return (chandef->chan->center_freq - lowest) / 20;
 }
 
 static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
@@ -1589,13 +1436,11 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 		break;
 	case NL80211_CHAN_WIDTH_80:
 		chnl_width = CH_80_MHZ_WIDTH;
-		act_primary =
-			mwl_fwcmd_get_80m_pri_chnl(pcmd->curr_chnl);
+		act_primary = mwl_fwcmd_get_pri_chnl_idx(&conf->chandef);
 		break;
 	case NL80211_CHAN_WIDTH_160:
 		chnl_width = CH_160_MHZ_WIDTH;
-		act_primary =
-			mwl_fwcmd_get_160m_pri_chnl(pcmd->curr_chnl);
+		act_primary = mwl_fwcmd_get_pri_chnl_idx(&conf->chandef);
 		break;
 	default:
 		mutex_unlock(&priv->fwcmd_mutex);
@@ -2486,8 +2331,7 @@ int mwl_fwcmd_set_switch_channel(struct ieee80211_hw *hw,
 		break;
 	case NL80211_CHAN_WIDTH_80:
 		chnl_width = CH_80_MHZ_WIDTH;
-		act_primary =
-			mwl_fwcmd_get_80m_pri_chnl(channel->hw_value);
+		act_primary = mwl_fwcmd_get_pri_chnl_idx(chandef);
 		if ((act_primary == ACT_PRIMARY_CHAN_0) ||
 		    (act_primary == ACT_PRIMARY_CHAN_2))
 			sec_chnl_offset = IEEE80211_HT_PARAM_CHA_SEC_ABOVE;
