@@ -722,6 +722,13 @@ struct add_ht_info {
 	__le16 stbc;
 } __packed;
 
+/* The firmware legacy rate bitmap has the 2.4 GHz rate set in bits 0-12:
+ * bits 0-4 are 1, 2, 5.5, 11 and 22 Mbps, bits 5-12 are 6-54 Mbps OFDM.
+ * This matches mwl_rates_24[] index for index. 5 GHz has only the OFDM
+ * rates, so its supp_rates bitmap has to be shifted past the CCK bits.
+ */
+#define HOSTCMD_LEGACY_RATE_OFDM_SHIFT          5
+
 struct peer_info {
 	__le32 legacy_rate_bitmap;
 	u8 ht_rates[4];

@@ -2169,7 +2169,8 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 	if (hw->conf.chandef.chan->band == NL80211_BAND_2GHZ)
 		rates = sta->deflink.supp_rates[NL80211_BAND_2GHZ];
 	else
-		rates = sta->deflink.supp_rates[NL80211_BAND_5GHZ] << 5;
+		rates = sta->deflink.supp_rates[NL80211_BAND_5GHZ] <<
+			HOSTCMD_LEGACY_RATE_OFDM_SHIFT;
 	pcmd->peer_info.legacy_rate_bitmap = cpu_to_le32(rates);
 
 	if (sta->deflink.ht_cap.ht_supported) {
@@ -2256,7 +2257,8 @@ int mwl_fwcmd_set_new_stn_add_sc4(struct ieee80211_hw *hw,
 	if (hw->conf.chandef.chan->band == NL80211_BAND_2GHZ)
 		rates = sta->deflink.supp_rates[NL80211_BAND_2GHZ];
 	else
-		rates = sta->deflink.supp_rates[NL80211_BAND_5GHZ] << 5;
+		rates = sta->deflink.supp_rates[NL80211_BAND_5GHZ] <<
+			HOSTCMD_LEGACY_RATE_OFDM_SHIFT;
 	pcmd->peer_info.legacy_rate_bitmap = cpu_to_le32(rates);
 
 	if (sta->deflink.ht_cap.ht_supported) {

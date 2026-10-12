@@ -798,8 +798,11 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	hw->vif_data_size = sizeof(struct mwl_vif);
 	hw->sta_data_size = sizeof(struct mwl_sta);
 
-	priv->ap_macids_supported = 0x0000ffff;
-	priv->sta_macids_supported = 0x00010000;
+	/* Firmware MAC IDs 0..15 are for AP interfaces, the next for STA */
+	priv->ap_macids_supported = GENMASK(SYSADPT_NUM_OF_AP - 1, 0);
+	priv->sta_macids_supported =
+		GENMASK(SYSADPT_NUM_OF_AP + SYSADPT_NUM_OF_CLIENT - 1,
+			SYSADPT_NUM_OF_AP);
 	priv->macids_used = 0;
 	INIT_LIST_HEAD(&priv->vif_list);
 	INIT_LIST_HEAD(&priv->sta_list);
