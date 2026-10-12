@@ -1206,6 +1206,7 @@ static void pcie_tx_account(struct mwl_priv *priv,
 			/* Go through non rate table buffer to see if any has
 			 * been used. If all used up, recycle by using index 0
 			 */
+			found = 0;
 			for (i = 0; i < TX_RATE_HISTO_CUSTOM_CNT; i++) {
 				if (!tx_hist_data[i].rateinfo ||
 				    ((tx_hist_data[i].rateinfo & ratemask) ==
@@ -1380,6 +1381,7 @@ static void pcie_tx_per(struct mwl_priv *priv, struct mwl_sta *sta_info,
 			/* Go through non rate table buffer to see if any has
 			 * been used. If all used up, recycle by using index 0
 			 */
+			found = 0;
 			for (i = 0; i < TX_RATE_HISTO_CUSTOM_CNT; i++) {
 				if (!tx_hist_data[i].rateinfo ||
 				    ((tx_hist_data[i].rateinfo & ratemask) ==

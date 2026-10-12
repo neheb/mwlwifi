@@ -252,7 +252,7 @@ static inline int pcie_rx_process_amsdu(struct mwl_priv *priv,
 	u8 *data;
 	u16 frame_len;
 	struct sk_buff *newskb;
-	int work_done;
+	int work_done = 0;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 
 	wh = (struct ieee80211_hdr *)skb->data;
