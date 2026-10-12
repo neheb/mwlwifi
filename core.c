@@ -1112,18 +1112,14 @@ int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name,
 	wiphy_info(priv->hw->wiphy, "%d TX antennas, %d RX antennas\n",
 		   tx_num, rx_num);
 
-#ifdef CONFIG_DEBUG_FS
 	mwl_debugfs_init(hw);
-#endif
 
 	return 0;
 }
 
 void mwl_deinit_hw(struct ieee80211_hw *hw)
 {
-#ifdef CONFIG_DEBUG_FS
 	mwl_debugfs_remove(hw);
-#endif
 
 	mwl_wl_deinit(hw->priv);
 }

@@ -18,7 +18,12 @@
 #ifndef _MWL_DEBUGFS_H_
 #define _MWL_DEBUGFS_H_
 
+#ifdef CONFIG_DEBUG_FS
 void mwl_debugfs_init(struct ieee80211_hw *hw);
 void mwl_debugfs_remove(struct ieee80211_hw *hw);
+#else
+static inline void mwl_debugfs_init(struct ieee80211_hw *hw) {}
+static inline void mwl_debugfs_remove(struct ieee80211_hw *hw) {}
+#endif
 
 #endif /* _MWL_DEBUGFS_H_ */
