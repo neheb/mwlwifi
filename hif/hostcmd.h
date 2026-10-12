@@ -566,6 +566,9 @@ struct hostcmd_cmd_set_mac_addr {
 } __packed;
 
 /* HOSTCMD_CMD_SET_RATE_ADAPT_MODE */
+#define RATE_ADAPT_MODE_INDOOR  0
+#define RATE_ADAPT_MODE_OUTDOOR 1
+
 struct hostcmd_cmd_set_rate_adapt_mode {
 	struct hostcmd_header cmd_hdr;
 	__le16 action;

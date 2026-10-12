@@ -355,10 +355,6 @@ struct mwl_priv {
 
 	bool debug_ampdu;
 	bool rx_decrypt;
-	bool rate_adapt_mode;
-	bool dwds_stamode;
-	bool optimization_level;
-	u32 feature;
 };
 
 #define MWL_CMD_BUF_SIZE 0x4000

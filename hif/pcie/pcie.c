@@ -38,12 +38,6 @@
 #define CHECK_BA_TRAFFIC_TIME           HZ  /* 1 sec */
 #define CHECK_TX_DONE_TIME              50  /* msec */
 
-static bool rate_adapt_mode = false;
-static bool dwds_stamode = true;
-static bool optimization_level = true;
-static bool dump_hostcmd = false;
-static unsigned int feature = 0x0;
-
 static struct pci_device_id pcie_id_tbl[] = {
 	{ PCI_VDEVICE(MARVELL, 0x2a55),     .driver_data = MWL8864, },
 	{ PCI_VDEVICE(MARVELL, 0x2b38),     .driver_data = MWL8897, },
@@ -267,7 +261,6 @@ static int pcie_init_8997(struct ieee80211_hw *hw)
 			cpu_to_le32(PCIE_MAX_TXRX_BD);
 	set_hw_spec.num_tx_queues = cpu_to_le32(1);
 	set_hw_spec.features |= HW_SET_PARMS_FEATURES_HOST_PROBE_RESP;
-	set_hw_spec.features |= cpu_to_le32(priv->feature);
 	set_hw_spec.total_rx_wcb = cpu_to_le32(PCIE_MAX_NUM_RX_DESC);
 	set_hw_spec.rxpd_wr_ptr = cpu_to_le32(pcie_priv->desc_data[0].pphys_rx_ring);
 	rc = mwl_fwcmd_set_hw_specs(hw, &set_hw_spec);
@@ -361,7 +354,6 @@ static int pcie_init_8864(struct ieee80211_hw *hw)
 		set_hw_spec.wcb_base[i] = cpu_to_le32(
 			pcie_priv->desc_data[i].pphys_tx_ring);
 	set_hw_spec.features |= HW_SET_PARMS_FEATURES_HOST_PROBE_RESP;
-	set_hw_spec.features |= cpu_to_le32(priv->feature);
 	set_hw_spec.tx_wcb_num_per_queue =
 			cpu_to_le32(PCIE_MAX_NUM_TX_DESC);
 	set_hw_spec.num_tx_queues = cpu_to_le32(PCIE_NUM_OF_DESC_DATA);
@@ -877,8 +869,6 @@ static int pcie_init_ndp(struct ieee80211_hw *hw)
 		cpu_to_le32(pcie_priv->desc_data_ndp.pphys_acnt_ring);
 	set_hw_spec.acnt_buf_size =
 		cpu_to_le32(pcie_priv->desc_data_ndp.acnt_ring_size);
-	set_hw_spec.features |=
-		cpu_to_le32(priv->feature);
 
 	rc = mwl_fwcmd_set_hw_specs(hw, &set_hw_spec);
 	if (rc) {
@@ -1690,15 +1680,6 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	pcie_priv = priv->hif.priv;
 	pcie_priv->mwl_priv = priv;
 
-	priv->rate_adapt_mode = rate_adapt_mode;
-	priv->dwds_stamode = dwds_stamode;
-	priv->optimization_level = optimization_level;
-	priv->dump_hostcmd = dump_hostcmd;
-	priv->feature = feature;
-
-	pr_info("rate_adapt_mode: %d, dwds_stamode: %d, optimization_level: %d, dump_hostcmd: %d, feature: %x\n",
-			rate_adapt_mode, dwds_stamode, optimization_level, dump_hostcmd, feature);
-
 	pcie_priv->pdev = pdev;
 	if (id->driver_data != MWL8964) {
 		pcie_priv->tx_head_room = PCIE_MIN_BYTES_HEADROOM;
@@ -1764,16 +1745,6 @@ static struct pci_driver mwl_pcie_driver = {
 	.remove   = pcie_remove
 };
 
-module_param(rate_adapt_mode, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-MODULE_PARM_DESC(rate_adapt_mode, "rate adapt mode");
-module_param(optimization_level, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-MODULE_PARM_DESC(optimization_level, "Optimization level");
-module_param(dwds_stamode, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-MODULE_PARM_DESC(dwds_stamode, "dwds stamode");
-module_param(dump_hostcmd, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-MODULE_PARM_DESC(dump_hostcmd, "dump_hostcmd");
-module_param(feature, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-MODULE_PARM_DESC(feature, "set feature hw");
 
 module_pci_driver(mwl_pcie_driver);
 
