@@ -1428,47 +1428,11 @@ static void pcie_ba_account(struct mwl_priv *priv,
 static void pcie_bf_mimo_ctrl_decode(struct mwl_priv *priv,
 				     struct acnt_bf_mimo_ctrl_s *bf_mimo_ctrl)
 {
-	struct file *fp_data = NULL;
-	const char filename[] = "/tmp/BF_MIMO_Ctrl_Field_Output.txt";
-	char str_buf[256];
-	char *buf = &str_buf[0];
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
-	mm_segment_t oldfs;
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
-	oldfs = get_fs();
-	set_fs( get_ds() );
-#elif LINUX_VERSION_CODE < KERNEL_VERSION(5,10,0)
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
-#elif LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
-	oldfs = force_uaccess_begin();
-#endif
-
-	buf += sprintf(buf, "\nMAC: %pM\n", bf_mimo_ctrl->rec_mac);
-	buf += sprintf(buf, "SU_0_MU_1: %d\n", bf_mimo_ctrl->type);
-	buf += sprintf(buf, "MIMO_Ctrl_Field: 0x%x\n",
-		       le32_to_cpu(bf_mimo_ctrl->mimo_ctrl));
-	buf += sprintf(buf, "Comp_BF_Report_First_8Bytes: 0x%llx\n",
-		       le64_to_cpu(bf_mimo_ctrl->comp_bf_rep));
-
-	fp_data = filp_open(filename, O_RDWR | O_CREAT | O_TRUNC, 0);
-
-	if (!IS_ERR(fp_data)) {
-		__kernel_write(fp_data, str_buf, strlen(str_buf),
-			       &fp_data->f_pos);
-		filp_close(fp_data, current->files);
-	} else {
-		wiphy_err(priv->hw->wiphy, "Error opening %s! %ld\n",
-			  filename, PTR_ERR(fp_data));
-	}
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,10,0)
-	set_fs(oldfs);
-#elif LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
-	force_uaccess_end(oldfs);
-#endif
+	wiphy_dbg(priv->hw->wiphy,
+		  "BF MIMO ctrl: MAC %pM %s MIMO_Ctrl_Field 0x%x Comp_BF_Report_First_8Bytes 0x%llx\n",
+		  bf_mimo_ctrl->rec_mac, bf_mimo_ctrl->type ? "MU" : "SU",
+		  le32_to_cpu(bf_mimo_ctrl->mimo_ctrl),
+		  le64_to_cpu(bf_mimo_ctrl->comp_bf_rep));
 }
 
 static void pcie_process_account(struct ieee80211_hw *hw)
