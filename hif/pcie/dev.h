@@ -18,7 +18,6 @@
 #ifndef _DEV_H_
 #define _DEV_H_
 
-#include <linux/version.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/firmware.h>

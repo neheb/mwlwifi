@@ -17,7 +17,6 @@
 
 #include <net/mac80211.h>
 #include <net/netlink.h>
-#include <linux/version.h>
 
 #include "sysadpt.h"
 #include "core.h"
@@ -43,11 +42,7 @@ static int mwl_vendor_cmd_set_bf_type(struct wiphy *wiphy,
 		return -EPERM;
 
 	rc = nla_parse(tb, MWL_VENDOR_ATTR_MAX, data, data_len,
-		       mwl_vendor_attr_policy
-#if (defined(LINUX_BACKPORT) || (LINUX_VERSION_CODE >=KERNEL_VERSION(4,12,0)))
-               , NULL
-#endif
-               );
+		       mwl_vendor_attr_policy, NULL);
 	if (rc)
 		return rc;
 
@@ -92,18 +87,16 @@ static const struct wiphy_vendor_command mwl_vendor_commands[] = {
 			  .subcmd = MWL_VENDOR_CMD_SET_BF_TYPE},
 		.flags = WIPHY_VENDOR_CMD_NEED_NETDEV,
 		.doit = mwl_vendor_cmd_set_bf_type,
-#ifdef VENDOR_CMD_RAW_DATA
 		.policy = mwl_vendor_attr_policy,
-#endif
+		.maxattr = MWL_VENDOR_ATTR_MAX,
 	},
 	{
 		.info = { .vendor_id = MRVL_OUI,
 			  .subcmd = MWL_VENDOR_CMD_GET_BF_TYPE},
 		.flags = WIPHY_VENDOR_CMD_NEED_NETDEV,
 		.doit = mwl_vendor_cmd_get_bf_type,
-#ifdef VENDOR_CMD_RAW_DATA
 		.policy = mwl_vendor_attr_policy,
-#endif
+		.maxattr = MWL_VENDOR_ATTR_MAX,
 	}
 };
 

@@ -33,9 +33,6 @@
 #include "hif/pcie/8964/rx_ndp.h"
 
 #define PCIE_DRV_DESC "Marvell Mac80211 Wireless PCIE Network Driver"
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,30)
-#define PCIE_DEV_NAME "Marvell 802.11ac PCIE Adapter"
-#endif
 
 #define MAX_WAIT_FW_COMPLETE_ITERATIONS 10000
 #define CHECK_BA_TRAFFIC_TIME           HZ  /* 1 sec */
@@ -1782,7 +1779,4 @@ MODULE_DESCRIPTION(PCIE_DRV_DESC);
 MODULE_VERSION(PCIE_DRV_VERSION);
 MODULE_AUTHOR("Marvell Semiconductor, Inc.");
 MODULE_LICENSE("GPL v2");
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,30)
-MODULE_SUPPORTED_DEVICE(PCIE_DEV_NAME);
-#endif
 MODULE_DEVICE_TABLE(pci, pcie_id_tbl);
