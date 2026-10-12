@@ -79,9 +79,9 @@ static int pcie_txbd_ring_create(struct mwl_priv *priv)
 	}
 	pcie_priv->txbd_ring_vbase = mem;
 	wiphy_info(priv->hw->wiphy,
-		   "TX ring: - base: %p, pbase: 0x%x, len: %d\n",
+		   "TX ring: - base: %p, pbase: %pad, len: %d\n",
 		   pcie_priv->txbd_ring_vbase,
-		   pcie_priv->txbd_ring_pbase,
+		   &pcie_priv->txbd_ring_pbase,
 		   pcie_priv->txbd_ring_size);
 
 	for (num = 0; num < PCIE_MAX_TXRX_BD; num++) {
