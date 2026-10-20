@@ -36,6 +36,7 @@
 #define FW_BOOTROM_READY_TIMEOUT_US     (5 * USEC_PER_SEC)
 #define FW_BLOCK_ACK_TIMEOUT_US         USEC_PER_SEC
 #define FW_BLOCK_ACK_POLL_US            2
+#define FW_BLOCK_START_TIMEOUT_US       100
 #define FW_READY_TIMEOUT_MS             (30 * MSEC_PER_SEC)
 
 /* Copy the block the bootrom asked for into the command buffer. The size
@@ -61,19 +62,18 @@ static int pcie_fill_block(struct mwl_priv *priv, const u8 *data,
 }
 
 /* Wait for the bootrom to pick up the block sent by
- * pcie_trigger_pcicmd_bootcode(): it first sets C1C, then clears the
- * doorbell bit once it is done with the block.
+ * pcie_trigger_pcicmd_bootcode(): it first sets C1C (~1.3 us after the
+ * doorbell), then clears the doorbell bit once it is done with the block.
+ * The bootrom may finish before C1C is ever seen non-zero, so missing that
+ * window is not an error; only the doorbell clear is required.
  */
 static int pcie_wait_block_ack(struct pcie_priv *pcie_priv)
 {
 	void __iomem *reg = pcie_priv->iobase1 + 0xc1c;
 	u32 int_code;
-	int ret;
 
-	ret = readl_poll_timeout(reg, int_code, int_code != 0,
-				 FW_BLOCK_ACK_POLL_US, FW_BLOCK_ACK_TIMEOUT_US);
-	if (ret)
-		return ret;
+	readl_poll_timeout_atomic(reg, int_code, int_code != 0,
+				  0, FW_BLOCK_START_TIMEOUT_US);
 
 	return readl_poll_timeout(reg, int_code,
 				  !(int_code & MACREG_H2ARIC_BIT_DOOR_BELL),

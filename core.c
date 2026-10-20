@@ -198,7 +198,7 @@ static int mwl_request_board_file(struct mwl_priv *priv,
 		if (!board_name)
 			return -ENOMEM;
 		strreplace(board_name + (ext - name) + 1, '/', '_');
-		rc = firmware_request_nowarn(fw, board_name, priv->dev);
+		rc = request_firmware_direct(fw, board_name, priv->dev);
 		if (!rc)
 			wiphy_info(priv->hw->wiphy, "using %s\n", board_name);
 		kfree(board_name);
@@ -269,13 +269,13 @@ static void mwl_process_of_dts(struct mwl_priv *priv)
 		if (strcmp(prop->name, "marvell,5ghz") == 0)
 			priv->disable_5g = true;
 		if (strcmp(prop->name, "marvell,chainmask") == 0) {
-			prop_value = be32_to_cpu(prop->value);
+			prop_value = be32_to_cpup((__be32 *)prop->value);
 			if (prop_value == 2)
 				priv->antenna_tx = ANTENNA_TX_2;
 			else if (prop_value == 3)
 				priv->antenna_tx = ANTENNA_TX_3;
 
-			prop_value = be32_to_cpu(prop->value + 4);
+			prop_value = be32_to_cpup((__be32 *)prop->value + 1);
 			if (prop_value == 2)
 				priv->antenna_rx = ANTENNA_RX_2;
 			else if (prop_value == 3)

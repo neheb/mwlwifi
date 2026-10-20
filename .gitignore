@@ -3,5 +3,6 @@
 mwlwifi.ko
 mwlwifi.mod
 mwlwifi.mod.c
-modules.orderModule.symvers
+modules.order
+Module.symvers
 .checkpatch-camelcase.git*

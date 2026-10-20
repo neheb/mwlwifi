@@ -1469,6 +1469,9 @@ static ssize_t mwl_debugfs_core_dump_read(struct file *file, char __user *ubuf,
 	if (priv->chip_type != MWL8964)
 		return -EPERM;
 
+	if (!IS_ENABLED(CONFIG_DEV_COREDUMP))
+		return -EOPNOTSUPP;
+
 	if (*ppos)
 		return 0;
 
@@ -1498,14 +1501,18 @@ static ssize_t mwl_debugfs_core_dump_read(struct file *file, char __user *ubuf,
 		goto err;
 	}
 
+	/* check each region before adding it so the sum can't wrap */
 	dump_size = sizeof(*cd);
-	for (i = 0; i < cd->num_regions; i++)
-		dump_size += le32_to_cpu(cd->region[i].length);
-	if (dump_size > MWL_COREDUMP_MAX_SIZE) {
-		wiphy_err(priv->hw->wiphy, "core dump: size %zu too large\n",
-			  dump_size);
-		ret = -EIO;
-		goto err;
+	for (i = 0; i < cd->num_regions; i++) {
+		length = le32_to_cpu(cd->region[i].length);
+		if (length > MWL_COREDUMP_MAX_SIZE - dump_size) {
+			wiphy_err(priv->hw->wiphy,
+				  "core dump: region %u length %x too large\n",
+				  i, length);
+			ret = -EIO;
+			goto err;
+		}
+		dump_size += length;
 	}
 
 	dump = vzalloc(dump_size);

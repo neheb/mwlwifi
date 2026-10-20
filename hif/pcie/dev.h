@@ -768,7 +768,7 @@ static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
 		memmove(&dma_data->wh, wh, hdrlen);
 
 	if (hdrlen != sizeof(dma_data->wh))
-		memset(((void *)&dma_data->wh) + hdrlen, 0,
+		memset(&dma_data->wh + hdrlen, 0,
 		       sizeof(dma_data->wh) - hdrlen);
 
 	/* Firmware length is the length of the fully formed "802.11
