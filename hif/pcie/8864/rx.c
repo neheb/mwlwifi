@@ -45,7 +45,7 @@ static int pcie_rx_ring_alloc(struct mwl_priv *priv)
 
 	desc = &pcie_priv->desc_data[0];
 
-	desc->prx_ring = (struct pcie_rx_desc *)
+	desc->prx_ring =
 		dma_alloc_coherent(priv->dev,
 				   MAX_NUM_RX_RING_BYTES,
 				   &desc->pphys_rx_ring,
@@ -269,8 +269,8 @@ static inline int pcie_rx_process_amsdu(struct mwl_priv *priv,
 	data = skb->data;
 
 	while (len < skb->len) {
-		frame_len = *(u8 *)(data + len + ETH_HLEN - 1) |
-			(*(u8 *)(data + len + ETH_HLEN - 2) << 8);
+		frame_len = *(data + len + ETH_HLEN - 1) |
+			(*(data + len + ETH_HLEN - 2) << 8);
 
 		if ((len + ETH_HLEN + frame_len) > skb->len)
 			break;
@@ -452,7 +452,7 @@ int pcie_8864_poll_napi(struct napi_struct *napi, int budget)
 
 				dma_data = (struct pcie_dma_data *)
 				     prx_skb->data;
-				memset((void *)&dma_data->data, 0, 4);
+				memset(&dma_data->data, 0, 4);
 				pkt_len += 4;
 			}
 

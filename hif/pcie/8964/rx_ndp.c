@@ -36,7 +36,7 @@ static int pcie_rx_ring_alloc_ndp(struct mwl_priv *priv)
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
 
-	desc->prx_ring = (struct pcie_rx_desc_ndp *)
+	desc->prx_ring =
 		dma_alloc_coherent(priv->dev,
 				   MAX_NUM_RX_RING_BYTES,
 				   &desc->pphys_rx_ring,
@@ -45,7 +45,7 @@ static int pcie_rx_ring_alloc_ndp(struct mwl_priv *priv)
 		goto err_no_mem;
 	memset(desc->prx_ring, 0x00, MAX_NUM_RX_RING_BYTES);
 
-	desc->prx_ring_done = (struct rx_ring_done *)
+	desc->prx_ring_done =
 		dma_alloc_coherent(priv->dev,
 				   MAX_NUM_RX_RING_DONE_BYTES,
 				   &desc->pphys_rx_ring_done,
@@ -586,7 +586,7 @@ recheck:
 			pktlen += sizeof(*rx_info);
 			pktlen += sizeof(struct pcie_dma_data);
 			if (bad_mic) {
-				memset((void *)&dma_data->data, 0, 4);
+				memset(&dma_data->data, 0, 4);
 				pktlen += 4;
 			}
 			if (skb_tailroom(psk_buff) >= pktlen) {

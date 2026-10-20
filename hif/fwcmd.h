@@ -103,7 +103,7 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 			     struct ieee80211_conf *conf);
 
 int mwl_fwcmd_set_aid(struct ieee80211_hw *hw,
-		      struct ieee80211_vif *vif, u8 *bssid, u16 aid);
+		      struct ieee80211_vif *vif, const u8 *bssid, u16 aid);
 
 int mwl_fwcmd_set_infra_mode(struct ieee80211_hw *hw,
 			     struct ieee80211_vif *vif);

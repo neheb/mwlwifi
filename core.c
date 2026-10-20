@@ -148,11 +148,10 @@ static const struct region_code_mapping regmap[] = {
 
 static int mwl_prepare_cmd_buf(struct mwl_priv *priv)
 {
-	priv->pcmd_buf =
-		(unsigned short *)dmam_alloc_coherent(priv->dev,
-						      MWL_CMD_BUF_SIZE,
-						      &priv->pphys_cmd_buf,
-						      GFP_KERNEL);
+	priv->pcmd_buf = dmam_alloc_coherent(priv->dev,
+					      MWL_CMD_BUF_SIZE,
+					      &priv->pphys_cmd_buf,
+					      GFP_KERNEL);
 	if (!priv->pcmd_buf) {
 		wiphy_err(priv->hw->wiphy,
 			  "cannot alloc memory for command buffer\n");
@@ -214,11 +213,9 @@ static int mwl_request_board_file(struct mwl_priv *priv,
 static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name,
 			     const char *cal_name, const char *txpwrlmt_name)
 {
-	int rc = 0;
+	int rc;
 
-	rc = request_firmware((const struct firmware **)&priv->fw_ucode,
-			      fw_name, priv->dev);
-
+	rc = request_firmware(&priv->fw_ucode, fw_name, priv->dev);
 	if (rc) {
 		wiphy_err(priv->hw->wiphy,
 			  "cannot find firmware image <%s>\n", fw_name);
@@ -233,14 +230,11 @@ static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name,
 	}
 
 	if (cal_name &&
-	    mwl_request_board_file(priv, (const struct firmware **)&priv->cal_data,
-				   cal_name))
+	    mwl_request_board_file(priv, &priv->cal_data, cal_name))
 		wiphy_debug(priv->hw->wiphy, "no calibration data\n");
 
 	if (txpwrlmt_name &&
-	    mwl_request_board_file(priv,
-				   (const struct firmware **)&priv->txpwrlmt_file,
-				   txpwrlmt_name))
+	    mwl_request_board_file(priv, &priv->txpwrlmt_file, txpwrlmt_name))
 		wiphy_debug(priv->hw->wiphy, "no tx power limit data\n");
 
 	return rc;
@@ -275,14 +269,13 @@ static void mwl_process_of_dts(struct mwl_priv *priv)
 		if (strcmp(prop->name, "marvell,5ghz") == 0)
 			priv->disable_5g = true;
 		if (strcmp(prop->name, "marvell,chainmask") == 0) {
-			prop_value = be32_to_cpu(*((__be32 *)prop->value));
+			prop_value = be32_to_cpu(prop->value);
 			if (prop_value == 2)
 				priv->antenna_tx = ANTENNA_TX_2;
 			else if (prop_value == 3)
 				priv->antenna_tx = ANTENNA_TX_3;
 
-			prop_value = be32_to_cpu(*((__be32 *)
-						 (prop->value + 4)));
+			prop_value = be32_to_cpu(prop->value + 4);
 			if (prop_value == 2)
 				priv->antenna_rx = ANTENNA_RX_2;
 			else if (prop_value == 3)

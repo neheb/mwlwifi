@@ -613,8 +613,6 @@ struct pcie_priv {
 	u32 acnt_wrap;
 	u32 acnt_drop;
 
-	/* KF2 - 88W8997 */
-	struct firmware *cal_data;
 	/* Write pointer for TXBD ring */
 	u32 txbd_wrptr;
 	/* Shadow copy of TXBD read pointer */

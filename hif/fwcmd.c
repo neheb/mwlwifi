@@ -119,12 +119,10 @@ char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 static int mwl_fwcmd_802_11_radio_control(struct mwl_priv *priv,
 					  bool enable, bool force)
 {
-	struct hostcmd_cmd_802_11_radio_control *pcmd;
+	struct hostcmd_cmd_802_11_radio_control *pcmd = priv->pcmd_buf;
 
 	if (enable == priv->radio_on && !force)
 		return 0;
-
-	pcmd = (struct hostcmd_cmd_802_11_radio_control *)&priv->pcmd_buf[0];
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -152,10 +150,8 @@ static int mwl_fwcmd_get_tx_powers(struct mwl_priv *priv, u16 *powlist,
 				   u8 action, u16 ch, u16 band,
 				   u16 width, u16 sub_ch)
 {
-	struct hostcmd_cmd_802_11_tx_power *pcmd;
+	struct hostcmd_cmd_802_11_tx_power *pcmd = priv->pcmd_buf;
 	int i;
-
-	pcmd = (struct hostcmd_cmd_802_11_tx_power *)&priv->pcmd_buf[0];
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -192,10 +188,8 @@ static int mwl_fwcmd_set_tx_powers(struct mwl_priv *priv, u16 txpow[],
 				   u8 action, u16 ch, u16 band,
 				   u16 width, u16 sub_ch)
 {
-	struct hostcmd_cmd_802_11_tx_power *pcmd;
+	struct hostcmd_cmd_802_11_tx_power *pcmd = priv->pcmd_buf;
 	int i;
-
-	pcmd = (struct hostcmd_cmd_802_11_tx_power *)&priv->pcmd_buf[0];
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -297,7 +291,7 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 
 	mgmt = (struct ieee80211_mgmt *)beacon;
 
-	baselen = (u8 *)mgmt->u.beacon.variable - (u8 *)mgmt;
+	baselen = mgmt->u.beacon.variable - (u8 *)mgmt;
 	if (baselen > len)
 		return;
 
@@ -310,7 +304,7 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 	beacon_info->cap_info = le16_to_cpu(mgmt->u.beacon.capab_info);
 	beacon_info->power_constraint = 0;
 
-	pos = (u8 *)mgmt->u.beacon.variable;
+	pos = mgmt->u.beacon.variable;
 	left = len - baselen;
 
 	elem_parse_failed = false;
@@ -488,7 +482,7 @@ static bool mwl_fwcmd_append_ie(struct hostcmd_cmd_set_ies *pcmd, u16 *len,
 
 static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 {
-	struct hostcmd_cmd_set_ies *pcmd;
+	struct hostcmd_cmd_set_ies *pcmd = priv->pcmd_buf;
 	struct beacon_info *beacon = &mwl_vif->beacon_info;
 	u16 ie_len = 0, off, elem_len;
 	bool ok = true;
@@ -498,8 +492,6 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 
 	if (beacon->ie_vht_len > sizeof(pcmd->ie_list_vht))
 		goto einval;
-
-	pcmd = (struct hostcmd_cmd_set_ies *)&priv->pcmd_buf[0];
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -566,7 +558,7 @@ static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv,
 				   struct mwl_vif *mwl_vif,
 				   struct ieee80211_bss_conf *bss_conf)
 {
-	struct hostcmd_cmd_ap_beacon *pcmd;
+	struct hostcmd_cmd_ap_beacon *pcmd = priv->pcmd_buf;
 	struct ds_params *phy_ds_param_set;
 
 	/* wmm structure of start command is defined less one byte,
@@ -583,8 +575,6 @@ static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv,
 	if (mwl_vif->beacon_info.ie_rsn48_len >
 	    sizeof(pcmd->start_cmd.rsn48_ie))
 		goto ielenerr;
-
-	pcmd = (struct hostcmd_cmd_ap_beacon *)&priv->pcmd_buf[0];
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -642,9 +632,7 @@ ielenerr:
 
 static int mwl_fwcmd_set_spectrum_mgmt(struct mwl_priv *priv, bool enable)
 {
-	struct hostcmd_cmd_set_spectrum_mgmt *pcmd;
-
-	pcmd = (struct hostcmd_cmd_set_spectrum_mgmt *)&priv->pcmd_buf[0];
+	struct hostcmd_cmd_set_spectrum_mgmt *pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -666,9 +654,7 @@ static int mwl_fwcmd_set_spectrum_mgmt(struct mwl_priv *priv, bool enable)
 static int mwl_fwcmd_set_power_constraint(struct mwl_priv *priv,
 					  u32 power_constraint)
 {
-	struct hostcmd_cmd_set_power_constraint *pcmd;
-
-	pcmd = (struct hostcmd_cmd_set_power_constraint *)&priv->pcmd_buf[0];
+	struct hostcmd_cmd_set_power_constraint *pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -691,7 +677,7 @@ static int mwl_fwcmd_set_country_code(struct mwl_priv *priv,
 				      struct mwl_vif *mwl_vif,
 				      struct ieee80211_bss_conf *bss_conf)
 {
-	struct hostcmd_cmd_set_country_code *pcmd;
+	struct hostcmd_cmd_set_country_code *pcmd = priv->pcmd_buf;
 	struct beacon_info *b_inf = &mwl_vif->beacon_info;
 	u8 chnl_len;
 	bool a_band;
@@ -716,8 +702,6 @@ static int mwl_fwcmd_set_country_code(struct mwl_priv *priv,
 
 		enable = true;
 	}
-
-	pcmd = (struct hostcmd_cmd_set_country_code *)&priv->pcmd_buf[0];
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -833,10 +817,8 @@ const struct hostcmd_get_hw_spec
 *mwl_fwcmd_get_hw_specs(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
-	struct hostcmd_cmd_get_hw_spec *pcmd;
+	struct hostcmd_cmd_get_hw_spec *pcmd = priv->pcmd_buf;
 	int retry;
-
-	pcmd = (struct hostcmd_cmd_get_hw_spec *)&priv->pcmd_buf[0];
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -868,9 +850,7 @@ int mwl_fwcmd_set_hw_specs(struct ieee80211_hw *hw,
 			   struct hostcmd_set_hw_spec *spec)
 {
 	struct mwl_priv *priv = hw->priv;
-	struct hostcmd_cmd_set_hw_spec *pcmd;
-
-	pcmd = (struct hostcmd_cmd_set_hw_spec *)&priv->pcmd_buf[0];
+	struct hostcmd_cmd_set_hw_spec *pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -893,9 +873,7 @@ int mwl_fwcmd_get_stat(struct ieee80211_hw *hw,
 		       struct ieee80211_low_level_stats *stats)
 {
 	struct mwl_priv *priv = hw->priv;
-	struct hostcmd_cmd_802_11_get_stat *pcmd;
-
-	pcmd = (struct hostcmd_cmd_802_11_get_stat *)&priv->pcmd_buf[0];
+	struct hostcmd_cmd_802_11_get_stat *pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -947,10 +925,8 @@ int mwl_fwcmd_get_addr_value(struct ieee80211_hw *hw, u32 addr, u32 len,
 			     u32 *val, u16 set)
 {
 	struct mwl_priv *priv = hw->priv;
-	struct hostcmd_cmd_mem_addr_access *pcmd;
+	struct hostcmd_cmd_mem_addr_access *pcmd = priv->pcmd_buf;
 	int i;
-
-	pcmd = (struct hostcmd_cmd_mem_addr_access *)&priv->pcmd_buf[0];
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1241,9 +1217,7 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 int mwl_fwcmd_rf_antenna(struct ieee80211_hw *hw, int dir, int antenna)
 {
 	struct mwl_priv *priv = hw->priv;
-	struct hostcmd_cmd_802_11_rf_antenna *pcmd;
-
-	pcmd = (struct hostcmd_cmd_802_11_rf_antenna *)&priv->pcmd_buf[0];
+	struct hostcmd_cmd_802_11_rf_antenna *pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1299,11 +1273,9 @@ int mwl_fwcmd_broadcast_ssid_enable(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_vif *mwl_vif;
-	struct hostcmd_cmd_broadcast_ssid_enable *pcmd;
+	struct hostcmd_cmd_broadcast_ssid_enable *pcmd = priv->pcmd_buf;
 
 	mwl_vif = mwl_dev_get_vif(vif);
-
-	pcmd = (struct hostcmd_cmd_broadcast_ssid_enable *)&priv->pcmd_buf[0];
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1328,15 +1300,13 @@ int mwl_fwcmd_broadcast_ssid_enable(struct ieee80211_hw *hw,
 int mwl_fwcmd_set_cfg_data(struct ieee80211_hw *hw, u16 type)
 {
 	struct mwl_priv *priv = hw->priv;
-	struct hostcmd_cmd_set_cfg *pcmd;
+	struct hostcmd_cmd_set_cfg *pcmd = priv->pcmd_buf;
 	size_t max = MWL_CMD_BUF_SIZE - offsetof(typeof(*pcmd), data);
 	size_t consumed;
 	int parsed_len;
 
 	if (!priv->cal_data)
 		return 0;
-
-	pcmd = (struct hostcmd_cmd_set_cfg *)&priv->pcmd_buf[0];
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1378,7 +1348,7 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 	struct hostcmd_cmd_set_rf_channel *pcmd;
 	u32 chnl_flags, freq_band, chnl_width, act_primary;
 
-	pcmd = (struct hostcmd_cmd_set_rf_channel *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1461,7 +1431,7 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 }
 
 int mwl_fwcmd_set_aid(struct ieee80211_hw *hw,
-		      struct ieee80211_vif *vif, u8 *bssid, u16 aid)
+		      struct ieee80211_vif *vif, const u8 *bssid, u16 aid)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_vif *mwl_vif;
@@ -1469,7 +1439,7 @@ int mwl_fwcmd_set_aid(struct ieee80211_hw *hw,
 
 	mwl_vif = mwl_dev_get_vif(vif);
 
-	pcmd = (struct hostcmd_cmd_set_aid *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1499,7 +1469,7 @@ int mwl_fwcmd_set_infra_mode(struct ieee80211_hw *hw,
 
 	mwl_vif = mwl_dev_get_vif(vif);
 
-	pcmd = (struct hostcmd_cmd_set_infra_mode *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1523,7 +1493,7 @@ int mwl_fwcmd_set_rts_threshold(struct ieee80211_hw *hw, int threshold)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_802_11_rts_thsd *pcmd;
 
-	pcmd = (struct hostcmd_cmd_802_11_rts_thsd *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1549,7 +1519,7 @@ int mwl_fwcmd_set_edca_params(struct ieee80211_hw *hw, u8 index,
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_edca_params *pcmd;
 
-	pcmd = (struct hostcmd_cmd_set_edca_params *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1581,7 +1551,7 @@ int mwl_fwcmd_set_radar_detect(struct ieee80211_hw *hw, u16 action)
 	u16 radar_type = RADAR_TYPE_CODE_0;
 	u8 channel = hw->conf.chandef.chan->hw_value;
 
-	pcmd = (struct hostcmd_cmd_802_11h_detect_radar *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	if (priv->dfs_region == NL80211_DFS_JP) {
 		if (channel >= 52 && channel <= 64)
@@ -1622,7 +1592,7 @@ int mwl_fwcmd_set_wmm_mode(struct ieee80211_hw *hw, bool enable)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_wmm_mode *pcmd;
 
-	pcmd = (struct hostcmd_cmd_set_wmm_mode *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1646,7 +1616,7 @@ int mwl_fwcmd_ht_guard_interval(struct ieee80211_hw *hw, u32 gi_type)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_ht_guard_interval *pcmd;
 
-	pcmd = (struct hostcmd_cmd_ht_guard_interval *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1671,7 +1641,7 @@ int mwl_fwcmd_use_fixed_rate(struct ieee80211_hw *hw, int mcast, int mgmt)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_fixed_rate *pcmd;
 
-	pcmd = (struct hostcmd_cmd_set_fixed_rate *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1698,7 +1668,7 @@ int mwl_fwcmd_set_linkadapt_cs_mode(struct ieee80211_hw *hw, u16 cs_mode)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_linkadapt_cs_mode *pcmd;
 
-	pcmd = (struct hostcmd_cmd_set_linkadapt_cs_mode *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1724,7 +1694,7 @@ int mwl_fwcmd_dump_otp_data(struct ieee80211_hw *hw)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_dump_otp_data *pcmd;
 
-	pcmd = (struct hostcmd_cmd_dump_otp_data *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1757,7 +1727,7 @@ int mwl_fwcmd_set_rate_adapt_mode(struct ieee80211_hw *hw, u16 mode)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_rate_adapt_mode *pcmd;
 
-	pcmd = (struct hostcmd_cmd_set_rate_adapt_mode *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1786,7 +1756,7 @@ int mwl_fwcmd_set_mac_addr_client(struct ieee80211_hw *hw,
 
 	mwl_vif = mwl_dev_get_vif(vif);
 
-	pcmd = (struct hostcmd_cmd_set_mac_addr *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1812,7 +1782,7 @@ int mwl_fwcmd_get_watchdog_bitmap(struct ieee80211_hw *hw, u8 *bitmap)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_get_watchdog_bitmap *pcmd;
 
-	pcmd = (struct hostcmd_cmd_get_watchdog_bitmap *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1841,7 +1811,7 @@ int mwl_fwcmd_remove_mac_addr(struct ieee80211_hw *hw,
 
 	mwl_vif = mwl_dev_get_vif(vif);
 
-	pcmd = (struct hostcmd_cmd_set_mac_addr *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1876,7 +1846,7 @@ int mwl_fwcmd_bss_start(struct ieee80211_hw *hw,
 	if (!enable && !(priv->running_bsses & (1 << mwl_vif->macid)))
 		return 0;
 
-	pcmd = (struct hostcmd_cmd_bss_start *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -1989,7 +1959,7 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 	mwl_vif = mwl_dev_get_vif(vif);
 	sta_info = mwl_dev_get_sta(sta);
 
-	pcmd = (struct hostcmd_cmd_set_new_stn *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2081,7 +2051,7 @@ int mwl_fwcmd_set_new_stn_add_sc4(struct ieee80211_hw *hw,
 	mwl_vif = mwl_dev_get_vif(vif);
 	sta_info = mwl_dev_get_sta(sta);
 
-	pcmd = (struct hostcmd_cmd_set_new_stn_sc4 *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2160,7 +2130,7 @@ int mwl_fwcmd_set_new_stn_wds_sc4(struct ieee80211_hw *hw, u8 *addr)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_new_stn_sc4 *pcmd;
 
-	pcmd = (struct hostcmd_cmd_set_new_stn_sc4 *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2191,7 +2161,7 @@ int mwl_fwcmd_set_new_stn_add_self(struct ieee80211_hw *hw,
 
 	mwl_vif = mwl_dev_get_vif(vif);
 
-	pcmd = (struct hostcmd_cmd_set_new_stn *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2228,7 +2198,7 @@ int mwl_fwcmd_set_new_stn_del(struct ieee80211_hw *hw,
 
 	mwl_vif = mwl_dev_get_vif(vif);
 
-	pcmd = (struct hostcmd_cmd_set_new_stn *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2270,7 +2240,7 @@ int mwl_fwcmd_set_apmode(struct ieee80211_hw *hw, u8 apmode)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_apmode *pcmd;
 
-	pcmd = (struct hostcmd_cmd_set_apmode *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2342,7 +2312,7 @@ int mwl_fwcmd_set_switch_channel(struct ieee80211_hw *hw,
 		((chnl_width << CHNL_WIDTH_SHIFT) & CHNL_WIDTH_MASK) |
 		((act_primary << ACT_PRIMARY_SHIFT) & ACT_PRIMARY_MASK);
 
-	pcmd = (struct hostcmd_cmd_set_switch_channel *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2378,7 +2348,7 @@ int mwl_fwcmd_update_encryption_enable(struct ieee80211_hw *hw,
 
 	mwl_vif = mwl_dev_get_vif(vif);
 
-	pcmd = (struct hostcmd_cmd_update_encryption *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2428,7 +2398,7 @@ int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 
 	mwl_vif = mwl_dev_get_vif(vif);
 
-	pcmd = (struct hostcmd_cmd_set_key *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2481,7 +2451,7 @@ int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 		return -ENOTSUPP;
 	}
 
-	memcpy((void *)&pcmd->key_param.key, key->key, keymlen);
+	memcpy(&pcmd->key_param.key, key->key, keymlen);
 	pcmd->action_type = cpu_to_le32(action);
 
 	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
@@ -2519,7 +2489,7 @@ int mwl_fwcmd_encryption_remove_key(struct ieee80211_hw *hw,
 
 	mwl_vif = mwl_dev_get_vif(vif);
 
-	pcmd = (struct hostcmd_cmd_set_key *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2564,7 +2534,7 @@ int mwl_fwcmd_check_ba(struct ieee80211_hw *hw,
 
 	mwl_vif = mwl_dev_get_vif(vif);
 
-	pcmd = (struct hostcmd_cmd_bastream *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2612,7 +2582,7 @@ int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 
 	mwl_vif = mwl_dev_get_vif(vif);
 
-	pcmd = (struct hostcmd_cmd_bastream *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2688,7 +2658,7 @@ int mwl_fwcmd_destroy_ba(struct ieee80211_hw *hw,
 	struct hostcmd_cmd_bastream *pcmd;
 	u32 ba_flags, ba_type, ba_direction;
 
-	pcmd = (struct hostcmd_cmd_bastream *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2884,7 +2854,7 @@ int mwl_fwcmd_set_optimization_level(struct ieee80211_hw *hw, u8 opt_level)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_optimization_level *pcmd;
 
-	pcmd = (struct hostcmd_cmd_set_optimization_level *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2908,7 +2878,7 @@ int mwl_fwcmd_set_wsc_ie(struct ieee80211_hw *hw, u8 len, u8 *data)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_wsc_ie *pcmd;
 
-	pcmd = (struct hostcmd_cmd_set_wsc_ie *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2941,7 +2911,7 @@ int mwl_fwcmd_get_ratetable(struct ieee80211_hw *hw, u8 *addr, u8 *rate_table,
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_get_ratetable *pcmd;
 
-	pcmd = (struct hostcmd_cmd_get_ratetable *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2970,7 +2940,7 @@ int mwl_fwcmd_get_seqno(struct ieee80211_hw *hw,
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_get_seqno *pcmd;
 
-	pcmd = (struct hostcmd_cmd_get_seqno *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -2997,7 +2967,7 @@ int mwl_fwcmd_set_dwds_stamode(struct ieee80211_hw *hw, bool enable)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_dwds_enable *pcmd;
 
-	pcmd = (struct hostcmd_cmd_dwds_enable *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3021,7 +2991,7 @@ int mwl_fwcmd_set_fw_flush_timer(struct ieee80211_hw *hw, u32 value)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_fw_flush_timer *pcmd;
 
-	pcmd = (struct hostcmd_cmd_fw_flush_timer *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3045,7 +3015,7 @@ int mwl_fwcmd_set_cdd(struct ieee80211_hw *hw)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_cdd *pcmd;
 
-	pcmd = (struct hostcmd_cmd_set_cdd *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3069,7 +3039,7 @@ int mwl_fwcmd_set_bftype(struct ieee80211_hw *hw, int mode)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_bftype *pcmd;
 
-	pcmd = (struct hostcmd_cmd_set_bftype *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3094,7 +3064,7 @@ int mwl_fwcmd_get_temp(struct ieee80211_hw *hw, u32 *temp)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_get_temp *pcmd;
 
-	pcmd = (struct hostcmd_cmd_get_temp *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3119,7 +3089,7 @@ int mwl_fwcmd_led_ctrl(struct ieee80211_hw *hw, u8 enable, u8 rate)
 	struct hostcmd_cmd_led_ctrl  *pcmd;
 	struct mwl_priv *priv = hw->priv;
 
-	pcmd = (struct hostcmd_cmd_led_ctrl *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3161,7 +3131,7 @@ int mwl_fwcmd_get_fw_region_code(struct ieee80211_hw *hw,
 	u16 cmd;
 	int status;
 
-	pcmd = (struct hostcmd_cmd_get_fw_region_code *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3201,7 +3171,7 @@ int mwl_fwcmd_get_device_pwr_tbl(struct ieee80211_hw *hw,
 	int status;
 	u16 cmd;
 
-	pcmd = (struct hostcmd_cmd_get_device_pwr_tbl *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3238,7 +3208,7 @@ int mwl_fwcmd_set_rate_drop(struct ieee80211_hw *hw, int enable,
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_rate_drop *pcmd;
 
-	pcmd = (struct hostcmd_cmd_set_rate_drop *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3265,7 +3235,7 @@ int mwl_fwcmd_newdp_dmathread_start(struct ieee80211_hw *hw)
 	struct hostcmd_cmd_newdp_dmathread_start *pcmd;
 	u16 cmd;
 
-	pcmd = (struct hostcmd_cmd_newdp_dmathread_start *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3292,7 +3262,7 @@ int mwl_fwcmd_get_fw_region_code_sc4(struct ieee80211_hw *hw,
 	struct hostcmd_cmd_get_fw_region_code_sc4 *pcmd;
 	u16 cmd;
 
-	pcmd = (struct hostcmd_cmd_get_fw_region_code_sc4 *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3332,7 +3302,7 @@ int mwl_fwcmd_get_pwr_tbl_sc4(struct ieee80211_hw *hw,
 	int status;
 	u16 cmd;
 
-	pcmd = (struct hostcmd_cmd_get_device_pwr_tbl_sc4 *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3369,7 +3339,7 @@ int mwl_fwcmd_quiet_mode(struct ieee80211_hw *hw, bool enable, u32 period,
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_quiet_mode *pcmd;
 
-	pcmd = (struct hostcmd_cmd_quiet_mode *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3399,7 +3369,7 @@ int mwl_fwcmd_core_dump_diag_mode(struct ieee80211_hw *hw, u16 status)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_core_dump_diag_mode *pcmd;
 
-	pcmd = (struct hostcmd_cmd_core_dump_diag_mode *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3427,7 +3397,7 @@ int mwl_fwcmd_get_fw_core_dump(struct ieee80211_hw *hw,
 	if (priv->chip_type != MWL8964)
 		return -EPERM;
 
-	pcmd = (struct hostcmd_cmd_get_fw_core_dump *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3466,7 +3436,7 @@ int mwl_fwcmd_set_slot_time(struct ieee80211_hw *hw, bool short_slot)
 	wiphy_debug(priv->hw->wiphy, "%s(): short_slot_time=%d\n",
 		    __func__, short_slot);
 
-	pcmd = (struct hostcmd_cmd_802_11_slot_time *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3491,7 +3461,7 @@ int mwl_fwcmd_config_EDMACCtrl(struct ieee80211_hw *hw, int EDMAC_Ctrl)
 	struct hostcmd_cmd_edmac_ctrl *pcmd;
 	struct mwl_priv *priv = hw->priv;
 
-	pcmd = (struct hostcmd_cmd_edmac_ctrl *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 
@@ -3581,7 +3551,7 @@ int mwl_fwcmd_set_txpwrlmt_cfg_data(struct ieee80211_hw *hw)
 		}
 		data_len = le16_to_cpu(hdr.len) - sizeof(hdr);
 
-		pcmd = (struct hostcmd_cmd_txpwrlmt_cfg *)&priv->pcmd_buf[0];
+		pcmd = priv->pcmd_buf;
 
 		mutex_lock(&priv->fwcmd_mutex);
 
@@ -3627,7 +3597,7 @@ int mwl_fwcmd_get_txpwrlmt_cfg_data(struct ieee80211_hw *hw)
 	u8 id;
 
 	for (id = 0; id < TXPWRLMT_CFG_MAX_SUBBAND_INFO; id++) {
-		pcmd = (struct hostcmd_cmd_txpwrlmt_cfg *)&priv->pcmd_buf[0];
+		pcmd = priv->pcmd_buf;
 
 		mutex_lock(&priv->fwcmd_mutex);
 
@@ -3672,7 +3642,7 @@ int mwl_fwcmd_mcast_cts(struct ieee80211_hw *hw, u8 enable)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_mcast_cts *pcmd;
 
-	pcmd = (struct hostcmd_cmd_mcast_cts *)&priv->pcmd_buf[0];
+	pcmd = priv->pcmd_buf;
 
 	mutex_lock(&priv->fwcmd_mutex);
 

@@ -45,7 +45,7 @@
 static int pcie_fill_block(struct mwl_priv *priv, const u8 *data,
 			   size_t remaining, u32 len)
 {
-	u8 *buf = (u8 *)priv->pcmd_buf;
+	u8 *buf = priv->pcmd_buf;
 
 	if (len > MWL_CMD_BUF_SIZE) {
 		wiphy_err(priv->hw->wiphy,
@@ -91,9 +91,9 @@ static void pcie_trigger_pcicmd_bootcode(struct pcie_priv *pcie_priv)
 
 static bool pcie_download_ddr_init(struct mwl_priv *priv)
 {
-	struct pcie_priv *pcie_priv = (struct pcie_priv *)priv->hif.priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
 	u32 size_ddr_init = sizeof(sc4_ddr_init);
-	u8 *p = (u8 *)&sc4_ddr_init[0];
+	u8 *p = &sc4_ddr_init[0];
 	u32 size_ddr_init_downloaded = 0;
 	u32 len = 0;
 
@@ -149,6 +149,7 @@ int pcie_download_firmware(struct ieee80211_hw *hw)
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	const struct firmware *fw = priv->fw_ucode;
+	u16 *pcmd = priv->pcmd_buf;
 	unsigned long timeout;
 	u32 size_fw_downloaded = 0;
 	u32 int_code = 0;
@@ -239,7 +240,7 @@ int pcie_download_firmware(struct ieee80211_hw *hw)
 	 * downloaded fw crashes, this signature checking will fail. This
 	 * part is similar as SC1
 	 */
-	*((u32 *)&priv->pcmd_buf[1]) = 0;
+	*(u32 *)&pcmd[1] = 0;
 	pcie_trigger_pcicmd_bootcode(pcie_priv);
 	timeout = jiffies + msecs_to_jiffies(FW_READY_TIMEOUT_MS);
 	do {

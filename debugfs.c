@@ -281,7 +281,7 @@ static void dump_tx_hist(char *p, int size, int *len, struct mwl_sta *sta_info)
 static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 				     size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	unsigned long flags;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
@@ -390,7 +390,7 @@ err_get_hw_specs:
 
 static ssize_t mwl_debugfs_rx_decrypt_read(struct file *file, char __user *ubuf,
 					   size_t count, loff_t *ppos) {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
@@ -412,7 +412,7 @@ static ssize_t mwl_debugfs_rx_decrypt_write(struct file *file,
 					  const char __user *ubuf,
 					  size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long addr = get_zeroed_page(GFP_KERNEL);
 	char *buf = (char *)addr;
 	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
@@ -444,7 +444,7 @@ err:
 static ssize_t mwl_debugfs_tx_status_read(struct file *file, char __user *ubuf,
 					  size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
@@ -464,7 +464,7 @@ static ssize_t mwl_debugfs_tx_status_read(struct file *file, char __user *ubuf,
 static ssize_t mwl_debugfs_rx_status_read(struct file *file, char __user *ubuf,
 					  size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
@@ -484,7 +484,7 @@ static ssize_t mwl_debugfs_rx_status_read(struct file *file, char __user *ubuf,
 static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 				    size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
@@ -579,7 +579,7 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 static ssize_t mwl_debugfs_sta_read(struct file *file, char __user *ubuf,
 				    size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
@@ -634,7 +634,7 @@ static ssize_t mwl_debugfs_sta_read(struct file *file, char __user *ubuf,
 static ssize_t mwl_debugfs_ampdu_read(struct file *file, char __user *ubuf,
 				      size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
@@ -703,7 +703,7 @@ static ssize_t mwl_debugfs_ampdu_write(struct file *file,
 					  const char __user *ubuf,
 					  size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long addr = get_zeroed_page(GFP_KERNEL);
 	char *buf = (char *)addr;
 	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
@@ -735,7 +735,7 @@ err:
 static ssize_t mwl_debugfs_stnid_read(struct file *file, char __user *ubuf,
 				      size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
@@ -767,7 +767,7 @@ static ssize_t mwl_debugfs_device_pwrtbl_read(struct file *file,
 					      char __user *ubuf,
 					      size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
@@ -808,7 +808,7 @@ static ssize_t mwl_debugfs_txpwrlmt_read(struct file *file,
 					 char __user *ubuf,
 					 size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 
 	return simple_read_from_buffer(ubuf, count, ppos,
 				       priv->txpwrlmt_data.buf,
@@ -819,7 +819,7 @@ static ssize_t mwl_debugfs_tx_amsdu_read(struct file *file,
 					 char __user *ubuf,
 					 size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
@@ -841,7 +841,7 @@ static ssize_t mwl_debugfs_tx_amsdu_write(struct file *file,
 					  const char __user *ubuf,
 					  size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long addr = get_zeroed_page(GFP_KERNEL);
 	char *buf = (char *)addr;
 	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
@@ -874,7 +874,7 @@ static ssize_t mwl_debugfs_dump_hostcmd_read(struct file *file,
 					     char __user *ubuf,
 					     size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
@@ -896,7 +896,7 @@ static ssize_t mwl_debugfs_dump_hostcmd_write(struct file *file,
 					      const char __user *ubuf,
 					      size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long addr = get_zeroed_page(GFP_KERNEL);
 	char *buf = (char *)addr;
 	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
@@ -929,7 +929,7 @@ static ssize_t mwl_debugfs_heartbeat_read(struct file *file,
 					  char __user *ubuf,
 					  size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
@@ -951,7 +951,7 @@ static ssize_t mwl_debugfs_heartbeat_write(struct file *file,
 					   const char __user *ubuf,
 					   size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long addr = get_zeroed_page(GFP_KERNEL);
 	char *buf = (char *)addr;
 	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
@@ -982,7 +982,7 @@ static ssize_t mwl_debugfs_thermal_read(struct file *file,
 					char __user *ubuf,
 					size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
@@ -1010,7 +1010,7 @@ static ssize_t mwl_debugfs_thermal_write(struct file *file,
 					 const char __user *ubuf,
 					 size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long addr = get_zeroed_page(GFP_KERNEL);
 	char *buf = (char *)addr;
 	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
@@ -1050,7 +1050,7 @@ err:
 static ssize_t mwl_debugfs_ratetable_read(struct file *file, char __user *ubuf,
 					  size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
@@ -1143,9 +1143,9 @@ static ssize_t mwl_debugfs_ratetable_read(struct file *file, char __user *ubuf,
 
 		len += scnprintf(p + len, size - len,
 			"%3d %5d %5d %5d %5d %5d %5d %5d %5d %5d %5d %5d %5d\n",
-			idx, (int)fmt, (int)stbc, (int)bw, (int)sgi, nss, rate,
-			(int)preamble_gf, (int)power_id, (int)ldpc, (int)bf,
-			(int)ant,
+			idx, fmt, stbc, bw, sgi, nss, rate,
+			preamble_gf, power_id, ldpc, bf,
+			ant,
 			utils_get_phy_rate(fmt, bw, sgi, mcs));
 
 		idx++;
@@ -1165,7 +1165,7 @@ static ssize_t mwl_debugfs_ratetable_write(struct file *file,
 					   const char __user *ubuf,
 					   size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long addr = get_zeroed_page(GFP_KERNEL);
 	char *buf = (char *)addr;
 	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
@@ -1203,7 +1203,7 @@ err:
 static ssize_t mwl_debugfs_tx_hist_read(struct file *file, char __user *ubuf,
 					size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
@@ -1255,7 +1255,7 @@ static ssize_t mwl_debugfs_tx_hist_write(struct file *file,
 					 const char __user *ubuf,
 					 size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long addr = get_zeroed_page(GFP_KERNEL);
 	char *buf = (char *)addr;
 	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
@@ -1296,7 +1296,7 @@ err:
 static ssize_t mwl_debugfs_ba_hist_read(struct file *file, char __user *ubuf,
 					size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	/* header and summary lines, plus one 36 byte line per entry */
 	size_t size = 256 + ACNT_BA_SIZE * 36;
 	char *p;
@@ -1387,7 +1387,7 @@ static ssize_t mwl_debugfs_ba_hist_write(struct file *file,
 					 const char __user *ubuf,
 					 size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long addr = get_zeroed_page(GFP_KERNEL);
 	char *buf = (char *)addr;
 	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
@@ -1453,7 +1453,7 @@ err:
 static ssize_t mwl_debugfs_core_dump_read(struct file *file, char __user *ubuf,
 					  size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long page;
 	char *p;
 	int len = 0, size = PAGE_SIZE;
@@ -1573,7 +1573,7 @@ static ssize_t mwl_debugfs_core_dump_write(struct file *file,
 					   const char __user *ubuf,
 					   size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long addr = get_zeroed_page(GFP_KERNEL);
 	char *buf = (char *)addr;
 	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
@@ -1611,7 +1611,7 @@ static ssize_t mwl_debugfs_mcast_cts_write(struct file *file,
 					   const char __user *ubuf,
 					   size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long addr = get_zeroed_page(GFP_KERNEL);
 	char *buf = (char *)addr;
 	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
@@ -1646,7 +1646,7 @@ static ssize_t mwl_debugfs_wmmedcaap_write(struct file *file,
 					   const char __user *ubuf,
 					   size_t count, loff_t *ppos)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct mwl_priv *priv = file->private_data;
 	unsigned long addr = get_zeroed_page(GFP_KERNEL);
 	char *buf = (char *)addr;
 	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);

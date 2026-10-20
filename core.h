@@ -209,9 +209,9 @@ struct txpwrlmt_cfg_data {
 struct mwl_priv {
 	struct ieee80211_hw *hw;
 	struct device *dev;
-	struct firmware *fw_ucode;
-	struct firmware *cal_data;
-	struct firmware *txpwrlmt_file;
+	const struct firmware *fw_ucode;
+	const struct firmware *cal_data;
+	const struct firmware *txpwrlmt_file;
 	struct otp_data otp_data;
 	struct txpwrlmt_cfg_data txpwrlmt_data;
 	bool fw_device_pwrtbl;
@@ -249,9 +249,9 @@ struct mwl_priv {
 	u16 max_tx_pow[SYSADPT_TX_GRP_PWR_LEVEL_TOTAL]; /* max tx power (dBm) */
 	u16 target_powers[SYSADPT_TX_GRP_PWR_LEVEL_TOTAL]; /* target powers   */
 
-	struct mutex fwcmd_mutex;    /* for firmware command         */
-	unsigned short *pcmd_buf;    /* pointer to CmdBuf (virtual)  */
-	dma_addr_t pphys_cmd_buf;    /* pointer to CmdBuf (physical) */
+	struct mutex fwcmd_mutex;	/* for firmware command         */
+	void *pcmd_buf;			/* pointer to CmdBuf (virtual)  */
+	dma_addr_t pphys_cmd_buf;	/* pointer to CmdBuf (physical) */
 	bool in_send_cmd;
 	bool cmd_timeout;
 	bool rmmod;

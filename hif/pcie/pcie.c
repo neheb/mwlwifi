@@ -170,9 +170,10 @@ static int pcie_wait_complete(struct mwl_priv *priv, unsigned short cmd)
 {
 	unsigned int curr_iteration = MAX_WAIT_FW_COMPLETE_ITERATIONS;
 	unsigned short int_code = 0;
+	__le16 *pcmd = priv->pcmd_buf;
 
 	do {
-		int_code = le16_to_cpu(*((__le16 *)&priv->pcmd_buf[0]));
+		int_code = le16_to_cpu(pcmd[0]);
 		usleep_range(1000, 2000);
 	} while ((int_code != cmd) && (--curr_iteration) && !priv->rmmod);
 
@@ -199,10 +200,10 @@ static int pcie_init_8997(struct ieee80211_hw *hw)
 
 	spin_lock_init(&pcie_priv->int_mask_lock);
 	tasklet_init(&pcie_priv->tx_task,
-		     (void *)pcie_8997_tx_skbs, (unsigned long)hw);
+		     pcie_8997_tx_skbs, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->tx_task);
 	tasklet_init(&pcie_priv->tx_done_task,
-		     (void *)pcie_8997_tx_done_task, (unsigned long)hw);
+		     pcie_8997_tx_done_task, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->tx_done_task);
 	spin_lock_init(&pcie_priv->tx_desc_lock);
 	pcie_priv->napi_dev = alloc_netdev_dummy(0);
@@ -297,9 +298,9 @@ static int pcie_init_8864(struct ieee80211_hw *hw)
 	int rc, i;
 
 	spin_lock_init(&pcie_priv->int_mask_lock);
-	tasklet_init(&pcie_priv->tx_task, (void *)pcie_8864_tx_skbs, (unsigned long)hw);
+	tasklet_init(&pcie_priv->tx_task, pcie_8864_tx_skbs, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->tx_task);
-	tasklet_init(&pcie_priv->tx_done_task, (void *)pcie_8864_tx_done_task, (unsigned long)hw);
+	tasklet_init(&pcie_priv->tx_done_task, pcie_8864_tx_done_task, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->tx_done_task);
 	spin_lock_init(&pcie_priv->tx_desc_lock);
 	pcie_priv->napi_dev = alloc_netdev_dummy(0);
@@ -750,11 +751,11 @@ static int pcie_init_ndp(struct ieee80211_hw *hw)
 
 	spin_lock_init(&pcie_priv->int_mask_lock);
 	tasklet_init(&pcie_priv->tx_task,
-		     (void *)pcie_tx_skbs_ndp, (unsigned long)hw);
+		     pcie_tx_skbs_ndp, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->tx_task);
 	spin_lock_init(&pcie_priv->tx_desc_lock);
 	tasklet_init(&pcie_priv->rx_task,
-		     (void *)pcie_rx_recv_ndp, (unsigned long)hw);
+		     pcie_rx_recv_ndp, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->rx_task);
 	pcie_priv->txq_limit = TX_QUEUE_LIMIT;
 	pcie_priv->txq_wake_threshold = TX_WAKE_Q_THRESHOLD;

@@ -183,7 +183,7 @@ static inline void pcie_tx_skb(struct mwl_priv *priv,
 
 	tx_info = IEEE80211_SKB_CB(tx_skb);
 	tx_ctrl = (struct pcie_tx_ctrl *)tx_info->driver_data;
-	k_conf = (struct ieee80211_key_conf *)tx_info->control.hw_key;
+	k_conf = tx_info->control.hw_key;
 
 	if (k_conf) {
 		switch (k_conf->cipher) {
@@ -267,7 +267,7 @@ struct sk_buff *pcie_tx_do_amsdu(struct mwl_priv *priv,
 	u8 *data;
 	int iv_len = 0;
 
-	sta = (struct ieee80211_sta *)tx_ctrl->sta;
+	sta = tx_ctrl->sta;
 	sta_info = mwl_dev_get_sta(sta);
 
 	if (!sta_info->is_amsdu_allowed)
@@ -285,7 +285,7 @@ struct sk_buff *pcie_tx_do_amsdu(struct mwl_priv *priv,
 
 	if (utils_is_crypted((struct ieee80211_hdr *)tx_skb->data)) {
 		struct ieee80211_key_conf * k_conf;
-		k_conf = (struct ieee80211_key_conf *)tx_info->control.hw_key;
+		k_conf = tx_info->control.hw_key;
 		if (likely(k_conf)) {
 			iv_len = k_conf->iv_len;
 			len -= iv_len;
@@ -338,8 +338,8 @@ struct sk_buff *pcie_tx_do_amsdu(struct mwl_priv *priv,
 		ether_addr_copy(data, ieee80211_get_DA(wh));
 		ether_addr_copy(data + ETH_ALEN, ieee80211_get_SA(wh));
 	}
-	*(u8 *)(data + ETH_HLEN - 1) = len & 0xff;
-	*(u8 *)(data + ETH_HLEN - 2) = (len >> 8) & 0xff;
+	*(data + ETH_HLEN - 1) = len & 0xff;
+	*(data + ETH_HLEN - 2) = (len >> 8) & 0xff;
 
 	skb_put_data(amsdu->skb, tx_skb->data + wh_len + iv_len, len);
 
@@ -410,7 +410,7 @@ static void pcie_pfu_tx_done(struct mwl_priv *priv)
 
 			info = IEEE80211_SKB_CB(done_skb);
 			tx_ctrl = (struct pcie_tx_ctrl *)info->driver_data;
-			sta = (struct ieee80211_sta *)tx_ctrl->sta;
+			sta = tx_ctrl->sta;
 			if (sta) {
 				sta_info = mwl_dev_get_sta(sta);
 				rate = sta_info->tx_rate_info;
@@ -746,7 +746,7 @@ void pcie_8997_tx_xmit(struct ieee80211_hw *hw,
 	}
 
 	tx_ctrl = (struct pcie_tx_ctrl *)tx_info->driver_data;
-	tx_ctrl->sta = (void *)sta;
+	tx_ctrl->sta = sta;
 	tx_ctrl->tx_priority = txpriority;
 	tx_ctrl->type = (mgmtframe ? IEEE_TYPE_MANAGEMENT : IEEE_TYPE_DATA);
 	tx_ctrl->qos_ctrl = qos;

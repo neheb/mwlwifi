@@ -396,7 +396,7 @@ static void mwl_mac80211_bss_info_changed_sta(struct ieee80211_hw *hw,
 	}
 
 	if ((changed & BSS_CHANGED_ASSOC) && vif->cfg.assoc)
-		mwl_fwcmd_set_aid(hw, vif, (u8 *)vif->bss_conf.bssid,
+		mwl_fwcmd_set_aid(hw, vif, vif->bss_conf.bssid,
 				  vif->cfg.aid);
 }
 
