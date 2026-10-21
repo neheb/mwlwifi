@@ -608,9 +608,9 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 			ieee80211_tx_status_skb(hw, ack_skb);
 		}
 
-		mic_room = pcie_tx_encapsulate_frame(priv, skb, k_conf);
-		if (!k_conf || k_conf->cipher != WLAN_CIPHER_SUITE_CCMP)
-			mic_room = 0;
+		pcie_tx_encapsulate_frame(priv, skb, k_conf);
+		if (k_conf && k_conf->cipher == WLAN_CIPHER_SUITE_CCMP)
+			mic_room = IEEE80211_CCMP_MIC_LEN;
 	} else {
 		tid = qos & 0x7;
 		if (sta && sta->deflink.ht_cap.ht_supported && !eapol_frame &&
@@ -673,10 +673,11 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 		 * management frame to include room for the MIC.
 		 */
 		if (skb_tailroom(skb) < mic_room &&
-		    pskb_expand_head(skb, 0, mic_room, GFP_ATOMIC))
-			mic_room = 0;
-		else
-			skb_put_zero(skb, mic_room);
+		    pskb_expand_head(skb, 0, mic_room, GFP_ATOMIC)) {
+			ieee80211_free_txskb(hw, skb);
+			return;
+		}
+		skb_put_zero(skb, mic_room);
 		wh = &((struct pcie_dma_data *)skb->data)->wh;
 	}
 
