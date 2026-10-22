@@ -761,9 +761,9 @@ static int pcie_init_ndp(struct ieee80211_hw *hw)
 	tasklet_disable(&pcie_priv->rx_task);
 	pcie_priv->txq_limit = TX_QUEUE_LIMIT;
 	pcie_priv->txq_wake_threshold = TX_WAKE_Q_THRESHOLD;
-	pcie_priv->is_tx_schedule = false;
 	pcie_priv->recv_limit = MAX_NUM_RX_DESC;
 	pcie_priv->is_rx_schedule = false;
+	pcie_priv->data_tasks_killed = false;
 
 	rc = pcie_tx_init_ndp(hw);
 	if (rc) {
@@ -837,11 +837,21 @@ static void pcie_deinit_ndp(struct ieee80211_hw *hw)
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 
-	pcie_rx_deinit_ndp(hw);
-	pcie_tx_deinit_ndp(hw);
+	/* Stop the firmware before freeing the buffers it may still use. */
+	pcie_reset(hw);
+
+	/* The tasklets are disabled while the radio is stopped, and
+	 * tasklet_kill() never returns for one that was scheduled in the
+	 * meantime. Let them run, as no-ops, so they can be killed.
+	 */
+	pcie_priv->data_tasks_killed = true;
+	tasklet_enable(&pcie_priv->rx_task);
+	tasklet_enable(&pcie_priv->tx_task);
 	tasklet_kill(&pcie_priv->rx_task);
 	tasklet_kill(&pcie_priv->tx_task);
-	pcie_reset(hw);
+
+	pcie_rx_deinit_ndp(hw);
+	pcie_tx_deinit_ndp(hw);
 }
 
 static int pcie_get_info_ndp(struct ieee80211_hw *hw, char *buf, size_t size)
@@ -1016,27 +1026,34 @@ static void pcie_timer_routine_ndp(struct ieee80211_hw *hw)
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	int num = SYSADPT_TX_WMM_QUEUES;
-	static int cnt;
 
-	if (!pcie_priv->is_tx_schedule) {
-		while (num--) {
-			if (skb_queue_len(&pcie_priv->txq[num]) > 0) {
-				tasklet_schedule(&pcie_priv->tx_task);
-				pcie_priv->is_tx_schedule = true;
-				break;
-			}
+	while (num--) {
+		if (skb_queue_len(&pcie_priv->txq[num]) > 0) {
+			tasklet_schedule(&pcie_priv->tx_task);
+			break;
 		}
 	}
 
-	if ((++cnt * SYSADPT_TIMER_WAKEUP_TIME) >= CHECK_TX_DONE_TIME) {
+	if ((++pcie_priv->tx_done_timer_cnt * SYSADPT_TIMER_WAKEUP_TIME) >=
+	    CHECK_TX_DONE_TIME) {
 		pcie_tx_done_ndp(hw);
-		cnt = 0;
+		pcie_priv->tx_done_timer_cnt = 0;
 	}
 }
 
 static void pcie_tx_return_pkts_ndp(struct ieee80211_hw *hw)
 {
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	int i;
+
 	pcie_tx_done_ndp(hw);
+
+	/* Frames the firmware still holds are returned as it completes
+	 * them, or on removal; only the queued ones can be dropped here.
+	 */
+	for (i = 0; i < SYSADPT_TX_WMM_QUEUES; i++)
+		ieee80211_purge_tx_queue(hw, &pcie_priv->txq[i]);
 }
 
 static void pcie_set_sta_id(struct ieee80211_hw *hw,

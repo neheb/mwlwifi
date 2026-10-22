@@ -489,6 +489,9 @@ void pcie_rx_recv_ndp(unsigned long data)
 	struct pcie_dma_data *dma_data;
 	u8 signal;
 
+	if (pcie_priv->data_tasks_killed)
+		return;
+
 	rx_done_head = readl(pcie_priv->iobase1 + MACREG_REG_RXDONEHEAD);
 	rx_done_tail = readl(pcie_priv->iobase1 + MACREG_REG_RXDONETAIL);
 	rx_desc_head = readl(pcie_priv->iobase1 + MACREG_REG_RXDESCHEAD);

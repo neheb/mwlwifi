@@ -42,6 +42,7 @@
 #define TX_CTRL_EAPOL           BIT(1)
 #define TX_CTRL_TCP_ACK         BIT(2)
 #define TX_CTRL_MIC_ROOM        BIT(3)
+#define TX_CTRL_STATUS_SENT     BIT(4)
 
 /* Transmission information to transmit a socket buffer.
  */
@@ -111,7 +112,7 @@ static int pcie_tx_ring_init_ndp(struct mwl_priv *priv)
 	for (i = 0; i < PCIE_NUM_OF_DESC_DATA; i++)
 		skb_queue_head_init(&pcie_priv->txq[i]);
 
-	if (!desc->ptx_ring) {
+	if (desc->ptx_ring) {
 		for (i = 0; i < MAX_NUM_TX_DESC; i++)
 			desc->ptx_ring[i].user = cpu_to_le32(i);
 		desc->tx_desc_busy_cnt = 0;
@@ -120,28 +121,81 @@ static int pcie_tx_ring_init_ndp(struct mwl_priv *priv)
 	return 0;
 }
 
+/* Unmap a TX buffer that the firmware has returned, or that it will never
+ * return, and hand the skb back to mac80211.
+ */
+static void pcie_tx_return_skb_ndp(struct ieee80211_hw *hw, u32 index,
+				   bool dropped)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
+	struct sk_buff *skb = desc->tx_vbuflist[index];
+	struct ieee80211_tx_info *tx_info;
+	struct pcie_tx_ctrl_ndp *tx_ctrl;
+	struct pcie_dma_data *dma_data;
+	u16 hdrlen;
+
+	dma_unmap_single(&(pcie_priv->pdev)->dev,
+			 desc->pphys_tx_buflist[index],
+			 desc->tx_buflen[index],
+			 DMA_TO_DEVICE);
+	desc->pphys_tx_buflist[index] = 0;
+	desc->tx_vbuflist[index] = NULL;
+
+	/* The status of this frame (or of a copy of it) has already been
+	 * reported; what is left is only the driver's reference.
+	 */
+	if (__test_and_clear_bit(index, desc->tx_status_sent)) {
+		dev_kfree_skb_any(skb);
+		return;
+	}
+
+	tx_info = IEEE80211_SKB_CB(skb);
+	tx_ctrl = (struct pcie_tx_ctrl_ndp *)tx_info->driver_data;
+
+	if (tx_ctrl->flags & TX_CTRL_TYPE_DATA) {
+		skb_push(skb, tx_ctrl->hdrlen);
+	} else {
+		if (tx_ctrl->flags & TX_CTRL_MIC_ROOM)
+			skb_trim(skb, skb->len - IEEE80211_CCMP_MIC_LEN);
+
+		/* Remove H/W dma header */
+		dma_data = (struct pcie_dma_data *)skb->data;
+		hdrlen = ieee80211_hdrlen(dma_data->wh.frame_control);
+		if (ieee80211_is_qos_nullfunc(dma_data->wh.frame_control) ||
+		   ieee80211_is_data_qos(dma_data->wh.frame_control)) {
+			memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen - IEEE80211_QOS_CTL_LEN);
+			*((__le16 *)(dma_data->data - IEEE80211_QOS_CTL_LEN)) = tx_ctrl->qos;
+		} else
+			memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen);
+		skb_pull(skb, sizeof(*dma_data) - hdrlen);
+	}
+
+	if (dropped) {
+		ieee80211_free_txskb(hw, skb);
+		return;
+	}
+
+	pcie_tx_prepare_info(priv, 0, tx_info);
+	ieee80211_tx_status_skb(hw, skb);
+}
+
 static void pcie_tx_ring_cleanup_ndp(struct mwl_priv *priv)
 {
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
-	struct sk_buff *tx_skb;
 	int i;
 
 	for (i = 0; i < PCIE_NUM_OF_DESC_DATA; i++)
-		skb_queue_purge(&pcie_priv->txq[i]);
+		ieee80211_purge_tx_queue(priv->hw, &pcie_priv->txq[i]);
 
-	for (i = 0; i < MAX_TX_RING_SEND_SIZE; i++) {
-		tx_skb = desc->tx_vbuflist[i];
-		if (tx_skb) {
-			dma_unmap_single(&(pcie_priv->pdev)->dev,
-					 desc->pphys_tx_buflist[i],
-					 tx_skb->len,
-					 DMA_TO_DEVICE);
-			dev_kfree_skb_any(tx_skb);
-			desc->pphys_tx_buflist[i] = 0;
-			desc->tx_vbuflist[i] = NULL;
-		}
-	}
+	/* Frames the firmware still holds would otherwise keep their
+	 * mac80211 ACK status entries alive.
+	 */
+	for (i = 0; i < MAX_TX_RING_SEND_SIZE; i++)
+		if (desc->tx_vbuflist[i])
+			pcie_tx_return_skb_ndp(priv->hw, i, true);
 	desc->tx_sent_tail = 0;
 	desc->tx_sent_head = 0;
 	desc->tx_done_tail = 0;
@@ -167,7 +221,7 @@ static void pcie_tx_ring_free_ndp(struct mwl_priv *priv)
 				  MAX_NUM_TX_RING_DONE_BYTES,
 				  desc->ptx_ring_done,
 				  desc->pphys_tx_ring_done);
-		desc->prx_ring_done = NULL;
+		desc->ptx_ring_done = NULL;
 	}
 
 	if (desc->pacnt_ring) {
@@ -179,6 +233,7 @@ static void pcie_tx_ring_free_ndp(struct mwl_priv *priv)
 	}
 
 	kfree(desc->pacnt_buf);
+	desc->pacnt_buf = NULL;
 }
 
 static inline u32 pcie_tx_set_skb(struct mwl_priv *priv, struct sk_buff *skb,
@@ -211,6 +266,7 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 	struct ieee80211_hdr *wh;
 	u32 ctrl = 0;
 	dma_addr_t dma;
+	u32 index;
 
 	spin_lock_bh(&pcie_priv->tx_desc_lock);
 
@@ -271,7 +327,7 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 	dma = dma_map_single(&(pcie_priv->pdev)->dev, tx_skb->data,
 			     tx_skb->len, DMA_TO_DEVICE);
 	if (dma_mapping_error(&(pcie_priv->pdev)->dev, dma)) {
-		dev_kfree_skb_any(tx_skb);
+		ieee80211_free_txskb(priv->hw, tx_skb);
 		wiphy_err(priv->hw->wiphy,
 			  "failed to map pci memory!\n");
 		spin_unlock_bh(&pcie_priv->tx_desc_lock);
@@ -280,14 +336,18 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 
 	pnext_tx_desc->data = cpu_to_le32(dma);
 	pnext_tx_desc->ctrl = cpu_to_le32(ctrl);
-	pnext_tx_desc->user = cpu_to_le32(pcie_tx_set_skb(priv, tx_skb, dma));
+	index = pcie_tx_set_skb(priv, tx_skb, dma);
+	desc->tx_buflen[index] = tx_skb->len;
+	pnext_tx_desc->user = cpu_to_le32(index);
 
-	if ((tx_ctrl->flags & TX_CTRL_TYPE_DATA) &&
-	    (tx_ctrl->rate != 0)) {
+	if (tx_ctrl->flags & TX_CTRL_STATUS_SENT) {
+		__set_bit(index, desc->tx_status_sent);
+	} else if ((tx_ctrl->flags & TX_CTRL_TYPE_DATA) &&
+		   (tx_ctrl->rate != 0)) {
+		__set_bit(index, desc->tx_status_sent);
 		skb_push(tx_skb, tx_ctrl->hdrlen);
 		skb_get(tx_skb);
 		pcie_tx_prepare_info(priv, tx_ctrl->rate, tx_info);
-		tx_ctrl->flags |= TX_CTRL_TYPE_DATA;
 		ieee80211_tx_status_skb(priv->hw, tx_skb);
 	}
 
@@ -308,23 +368,31 @@ static inline void pcie_tx_check_tcp_ack(struct sk_buff *tx_skb,
 {
 	struct iphdr *iph;
 	struct tcphdr *tcph;
+	unsigned int off;
 
-	if (tx_ctrl->flags & TX_CTRL_TYPE_DATA) {
-		iph = (struct iphdr *)(tx_skb->data + tx_ctrl->hdrlen + 8);
-		tcph = (struct tcphdr *)((u8 *)iph + (iph->ihl * 4));
-		if ((iph->protocol == IPPROTO_TCP) &&
-		    (tx_skb->protocol == htons(ETH_P_IP))) {
-			if ((tcph->ack == 1) && (ntohs(iph->tot_len) ==
-			    (iph->ihl * 4 + tcph->doff * 4))) {
-				if (tcph->syn || tcph->fin)
-					return;
+	if (!(tx_ctrl->flags & TX_CTRL_TYPE_DATA) ||
+	    tx_skb->protocol != htons(ETH_P_IP))
+		return;
 
-				tx_ctrl->flags |= TX_CTRL_TCP_ACK;
-				tx_ctrl->tcp_dst_src = ntohs(tcph->source) |
-					(ntohs(tcph->dest) << 16);
-				tx_ctrl->tcp_sn = ntohl(tcph->ack_seq);
-			}
-		}
+	/* Skip the 802.11 header and the LLC/SNAP header. */
+	off = tx_ctrl->hdrlen + 8;
+	if (skb_headlen(tx_skb) < off + sizeof(*iph))
+		return;
+	iph = (struct iphdr *)(tx_skb->data + off);
+	if (iph->protocol != IPPROTO_TCP || iph->ihl < 5 ||
+	    skb_headlen(tx_skb) < off + iph->ihl * 4 + sizeof(*tcph))
+		return;
+	tcph = (struct tcphdr *)((u8 *)iph + (iph->ihl * 4));
+
+	if ((tcph->ack == 1) && (ntohs(iph->tot_len) ==
+	    (iph->ihl * 4 + tcph->doff * 4))) {
+		if (tcph->syn || tcph->fin)
+			return;
+
+		tx_ctrl->flags |= TX_CTRL_TCP_ACK;
+		tx_ctrl->tcp_dst_src = ntohs(tcph->source) |
+			(ntohs(tcph->dest) << 16);
+		tx_ctrl->tcp_sn = ntohl(tcph->ack_seq);
 	}
 }
 
@@ -372,6 +440,9 @@ void pcie_tx_skbs_ndp(unsigned long data)
 	struct sk_buff *tx_skb;
 	int rc;
 
+	if (pcie_priv->data_tasks_killed)
+		return;
+
 	while (num--) {
 		while (skb_queue_len(&pcie_priv->txq[num]) > 0) {
 			if (pcie_priv->desc_data_ndp.tx_desc_busy_cnt >=
@@ -406,8 +477,6 @@ void pcie_tx_skbs_ndp(unsigned long data)
 				ieee80211_wake_queue(hw, queue);
 		}
 	}
-
-	pcie_priv->is_tx_schedule = false;
 }
 
 void pcie_tx_done_ndp(struct ieee80211_hw *hw)
@@ -418,11 +487,6 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 	u32 tx_done_head, tx_done_tail;
 	struct tx_ring_done *ptx_ring_done;
 	u32 index;
-	struct sk_buff *skb;
-	struct ieee80211_tx_info *tx_info;
-	struct pcie_tx_ctrl_ndp *tx_ctrl;
-	struct pcie_dma_data *dma_data;
-	u16 hdrlen;
 
 	spin_lock_bh(&pcie_priv->tx_desc_lock);
 
@@ -436,64 +500,20 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 
 		index = le32_to_cpu(ptx_ring_done->user);
 		ptx_ring_done->user = 0;
+		/* Skip a bad entry rather than stall the ring on it. */
 		if (index >= MAX_TX_RING_SEND_SIZE) {
 			wiphy_err(hw->wiphy,
 				  "corruption for index of buffer\n");
-			break;
-		}
-		skb = desc->tx_vbuflist[index];
-		if (!skb) {
+		} else if (!desc->tx_vbuflist[index]) {
 			wiphy_err(hw->wiphy,
 				  "buffer is NULL for tx done ring\n");
-			break;
-		}
-		dma_unmap_single(&(pcie_priv->pdev)->dev,
-				 desc->pphys_tx_buflist[index],
-				 skb->len,
-				 DMA_TO_DEVICE);
-		desc->pphys_tx_buflist[index] = 0;
-		desc->tx_vbuflist[index] = NULL;
-
-		tx_info = IEEE80211_SKB_CB(skb);
-		tx_ctrl = (struct pcie_tx_ctrl_ndp *)
-			tx_info->driver_data;
-
-		if (tx_ctrl->flags & TX_CTRL_TYPE_DATA) {
-			dev_kfree_skb_any(skb);
-			goto bypass_ack;
 		} else {
-			if (tx_ctrl->flags & TX_CTRL_MIC_ROOM)
-				skb_trim(skb,
-					 skb->len - IEEE80211_CCMP_MIC_LEN);
-
-			/* Remove H/W dma header */
-			dma_data = (struct pcie_dma_data *)skb->data;
-
-			if (ieee80211_is_assoc_resp(
-			    dma_data->wh.frame_control) ||
-			    ieee80211_is_reassoc_resp(
-			    dma_data->wh.frame_control)) {
-				dev_kfree_skb_any(skb);
-				goto bypass_ack;
-			}
-			hdrlen = ieee80211_hdrlen(
-				dma_data->wh.frame_control);
-			if (ieee80211_is_qos_nullfunc(dma_data->wh.frame_control) ||
-			   ieee80211_is_data_qos(dma_data->wh.frame_control)) {
-				memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen - IEEE80211_QOS_CTL_LEN);
-				*((__le16 *)(dma_data->data - IEEE80211_QOS_CTL_LEN)) = tx_ctrl->qos;
-			} else
-				memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen);
-			skb_pull(skb, sizeof(*dma_data) - hdrlen);
+			pcie_tx_return_skb_ndp(hw, index, false);
+			desc->tx_desc_busy_cnt--;
 		}
 
-		pcie_tx_prepare_info(priv, 0, tx_info);
-		ieee80211_tx_status_skb(hw, skb);
-
-bypass_ack:
 		if (++tx_done_tail >= MAX_TX_RING_DONE_SIZE)
 			tx_done_tail = 0;
-		desc->tx_desc_busy_cnt--;
 	}
 
 	writel(tx_done_tail, pcie_priv->iobase1 +
@@ -527,6 +547,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 	bool start_ba_session = false;
 	struct pcie_tx_ctrl_ndp *tx_ctrl;
 	int mic_room = 0;
+	bool status_sent = false;
 
 	tx_info = IEEE80211_SKB_CB(skb);
 	k_conf = tx_info->control.hw_key;
@@ -597,15 +618,24 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 			}
 		}
 
+		/* The firmware reports no ACK status, and can hold on to
+		 * probe responses for minutes, so report the status of a
+		 * copy right away.
+		 */
 		if (ieee80211_is_assoc_resp(wh->frame_control) ||
-		    ieee80211_is_reassoc_resp(wh->frame_control)) {
+		    ieee80211_is_reassoc_resp(wh->frame_control) ||
+		    (ieee80211_is_probe_resp(wh->frame_control) &&
+		     (tx_info->flags & IEEE80211_TX_CTL_REQ_TX_STATUS))) {
 			struct sk_buff *ack_skb;
 			struct ieee80211_tx_info *ack_info;
 
 			ack_skb = skb_copy(skb, GFP_ATOMIC);
-			ack_info = IEEE80211_SKB_CB(ack_skb);
-			pcie_tx_prepare_info(priv, 0, ack_info);
-			ieee80211_tx_status_skb(hw, ack_skb);
+			if (ack_skb) {
+				ack_info = IEEE80211_SKB_CB(ack_skb);
+				pcie_tx_prepare_info(priv, 0, ack_info);
+				ieee80211_tx_status_skb(hw, ack_skb);
+				status_sent = true;
+			}
 		}
 
 		pcie_tx_encapsulate_frame(priv, skb, k_conf);
@@ -623,7 +653,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 				wiphy_warn(hw->wiphy,
 					   "can't send packet during ADDBA\n");
 				spin_unlock_bh(&priv->stream_lock);
-				dev_kfree_skb_any(skb);
+				ieee80211_free_txskb(hw, skb);
 				return;
 			}
 			if ((stream->state == AMPDU_NO_STREAM) &&
@@ -689,6 +719,8 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 	tx_ctrl->flags = 0;
 	if (mic_room)
 		tx_ctrl->flags |= TX_CTRL_MIC_ROOM;
+	if (status_sent)
+		tx_ctrl->flags |= TX_CTRL_STATUS_SENT;
 	tx_ctrl->qos = qos;
 	if (!mgmtframe)
 		tx_ctrl->flags |= TX_CTRL_TYPE_DATA;
@@ -705,10 +737,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 
 	skb_queue_tail(&pcie_priv->txq[index], skb);
 
-	if (!pcie_priv->is_tx_schedule) {
-		tasklet_schedule(&pcie_priv->tx_task);
-		pcie_priv->is_tx_schedule = true;
-	}
+	tasklet_schedule(&pcie_priv->tx_task);
 
 	/* Initiate the ampdu session here */
 	if (start_ba_session) {

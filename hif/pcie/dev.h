@@ -482,6 +482,9 @@ struct pcie_desc_data_ndp {
 	/* keept the skb owned by fw */
 	dma_addr_t pphys_tx_buflist[MAX_TX_RING_SEND_SIZE];
 	struct sk_buff *tx_vbuflist[MAX_TX_RING_SEND_SIZE];
+	u16 tx_buflen[MAX_TX_RING_SEND_SIZE]; /* mapped length of the skb */
+	/* mac80211 already has the status of the skb */
+	DECLARE_BITMAP(tx_status_sent, MAX_TX_RING_SEND_SIZE);
 	u32 tx_vbuflist_idx;              /* idx to empty slot in tx_vbuflist*/
 	struct sk_buff *rx_vbuflist[MAX_NUM_RX_DESC];
 	struct tx_ring_done *ptx_ring_done;
@@ -588,7 +591,6 @@ struct pcie_priv {
 	unsigned int tx_head_room;
 	int txq_limit;
 	int txq_wake_threshold;
-	bool is_tx_schedule;
 	bool is_tx_done_schedule;
 	int recv_limit;
 	bool is_rx_schedule;
@@ -603,6 +605,8 @@ struct pcie_priv {
 	/* new data path */
 	struct pcie_desc_data_ndp desc_data_ndp;
 	int tx_done_cnt;
+	int tx_done_timer_cnt;
+	bool data_tasks_killed;
 	struct ieee80211_sta *sta_link[SYSADPT_MAX_STA_SC4 + 1];
 	struct sk_buff_head rx_skb_trace;
 	struct ndp_rx_counter rx_cnts;
