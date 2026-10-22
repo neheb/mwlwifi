@@ -555,13 +555,19 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 	if (mgmtframe) {
 		u16 capab;
 
+		/* The body of a protected frame starts with its CCMP
+		 * header (or is encrypted). mac80211 queues ADDBA requests
+		 * on the right AC anyway.
+		 */
 		if (unlikely(ieee80211_is_action(wh->frame_control) &&
+			     !ieee80211_has_protected(wh->frame_control) &&
 			     mgmt->u.action.category == WLAN_CATEGORY_BACK &&
 			     mgmt->u.action.action_code ==
 			     WLAN_ACTION_ADDBA_REQ)) {
 			capab = le16_to_cpu(mgmt->u.action.addba_req.capab);
 			tid = (capab & IEEE80211_ADDBA_PARAM_TID_MASK) >> 2;
-			index = utils_tid_to_ac(tid);
+			if (tid < IEEE80211_FIRST_TSPEC_TSID)
+				index = utils_tid_to_ac(tid);
 		}
 
 		if (ieee80211_is_probe_req(wh->frame_control) ||
@@ -602,9 +608,9 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 			ieee80211_tx_status_skb(hw, ack_skb);
 		}
 
-		mic_room = pcie_tx_encapsulate_frame(priv, skb, k_conf);
-		if (!k_conf || k_conf->cipher != WLAN_CIPHER_SUITE_CCMP)
-			mic_room = 0;
+		pcie_tx_encapsulate_frame(priv, skb, k_conf);
+		if (k_conf && k_conf->cipher == WLAN_CIPHER_SUITE_CCMP)
+			mic_room = IEEE80211_CCMP_MIC_LEN;
 	} else {
 		tid = qos & 0x7;
 		if (sta && sta->deflink.ht_cap.ht_supported && !eapol_frame &&
@@ -667,10 +673,11 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 		 * management frame to include room for the MIC.
 		 */
 		if (skb_tailroom(skb) < mic_room &&
-		    pskb_expand_head(skb, 0, mic_room, GFP_ATOMIC))
-			mic_room = 0;
-		else
-			skb_put_zero(skb, mic_room);
+		    pskb_expand_head(skb, 0, mic_room, GFP_ATOMIC)) {
+			ieee80211_free_txskb(hw, skb);
+			return;
+		}
+		skb_put_zero(skb, mic_room);
 		wh = &((struct pcie_dma_data *)skb->data)->wh;
 	}
 
