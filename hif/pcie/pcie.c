@@ -205,6 +205,7 @@ static int pcie_init_8997(struct ieee80211_hw *hw)
 	tasklet_init(&pcie_priv->tx_done_task,
 		     pcie_8997_tx_done_task, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->tx_done_task);
+	pcie_priv->data_tasks_killed = false;
 	spin_lock_init(&pcie_priv->tx_desc_lock);
 	pcie_priv->napi_dev = alloc_netdev_dummy(0);
 	if (!pcie_priv->napi_dev)
@@ -303,6 +304,7 @@ static int pcie_init_8864(struct ieee80211_hw *hw)
 	tasklet_disable(&pcie_priv->tx_task);
 	tasklet_init(&pcie_priv->tx_done_task, pcie_8864_tx_done_task, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->tx_done_task);
+	pcie_priv->data_tasks_killed = false;
 	spin_lock_init(&pcie_priv->tx_desc_lock);
 	pcie_priv->napi_dev = alloc_netdev_dummy(0);
 	if (!pcie_priv->napi_dev)
@@ -394,13 +396,23 @@ static void pcie_deinit_8997(struct ieee80211_hw *hw)
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 
-	pcie_8997_rx_deinit(hw);
-	pcie_8997_tx_deinit(hw);
+	/* Stop the firmware before freeing the buffers it may still use. */
+	pcie_reset(hw);
+
+	/* The tasklets are disabled while the radio is stopped, and
+	 * tasklet_kill() never returns for one that was scheduled in the
+	 * meantime. Let them run, as no-ops, so they can be killed.
+	 */
+	pcie_priv->data_tasks_killed = true;
+	tasklet_enable(&pcie_priv->tx_task);
+	tasklet_enable(&pcie_priv->tx_done_task);
 	tasklet_kill(&pcie_priv->tx_done_task);
 	tasklet_kill(&pcie_priv->tx_task);
+
+	pcie_8997_rx_deinit(hw);
+	pcie_8997_tx_deinit(hw);
 	netif_napi_del(&pcie_priv->napi);
 	free_netdev(pcie_priv->napi_dev);
-	pcie_reset(hw);
 }
 
 static void pcie_deinit_8864(struct ieee80211_hw *hw)
@@ -408,13 +420,23 @@ static void pcie_deinit_8864(struct ieee80211_hw *hw)
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 
-	pcie_8864_rx_deinit(hw);
-	pcie_8864_tx_deinit(hw);
+	/* Stop the firmware before freeing the buffers it may still use. */
+	pcie_reset(hw);
+
+	/* The tasklets are disabled while the radio is stopped, and
+	 * tasklet_kill() never returns for one that was scheduled in the
+	 * meantime. Let them run, as no-ops, so they can be killed.
+	 */
+	pcie_priv->data_tasks_killed = true;
+	tasklet_enable(&pcie_priv->tx_task);
+	tasklet_enable(&pcie_priv->tx_done_task);
 	tasklet_kill(&pcie_priv->tx_done_task);
 	tasklet_kill(&pcie_priv->tx_task);
+
+	pcie_8864_rx_deinit(hw);
+	pcie_8864_tx_deinit(hw);
 	netif_napi_del(&pcie_priv->napi);
 	free_netdev(pcie_priv->napi_dev);
-	pcie_reset(hw);
 }
 
 static int pcie_get_info(struct ieee80211_hw *hw, char *buf, size_t size)
@@ -650,12 +672,26 @@ static void pcie_timer_routine(struct ieee80211_hw *hw)
 
 static void pcie_8997_tx_return_pkts(struct ieee80211_hw *hw)
 {
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	int num;
+
 	pcie_8997_tx_done((unsigned long)hw);
+
+	for (num = 0; num < PCIE_NUM_OF_DESC_DATA; num++)
+		ieee80211_purge_tx_queue(hw, &pcie_priv->txq[num]);
 }
 
 static void pcie_8864_tx_return_pkts(struct ieee80211_hw *hw)
 {
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	int num;
+
 	pcie_8864_tx_done((unsigned long)hw);
+
+	for (num = 0; num < PCIE_NUM_OF_DESC_DATA; num++)
+		ieee80211_purge_tx_queue(hw, &pcie_priv->txq[num]);
 }
 
 static struct device_node *pcie_get_device_node(struct ieee80211_hw *hw)
