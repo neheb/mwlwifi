@@ -41,7 +41,6 @@
 #define TX_CTRL_TYPE_DATA       BIT(0)
 #define TX_CTRL_EAPOL           BIT(1)
 #define TX_CTRL_TCP_ACK         BIT(2)
-#define TX_CTRL_MIC_ROOM        BIT(3)
 #define TX_CTRL_STATUS_SENT     BIT(4)
 
 /* Transmission information to transmit a socket buffer.
@@ -54,6 +53,7 @@ struct pcie_tx_ctrl_ndp {
 	u32 tcp_dst_src;
 	u32 tcp_sn;
 	u16 qos;
+	u8 mic_room;
 } __packed;
 
 static int pcie_tx_ring_alloc_ndp(struct mwl_priv *priv)
@@ -157,8 +157,7 @@ static void pcie_tx_return_skb_ndp(struct ieee80211_hw *hw, u32 index,
 	if (tx_ctrl->flags & TX_CTRL_TYPE_DATA) {
 		skb_push(skb, tx_ctrl->hdrlen);
 	} else {
-		if (tx_ctrl->flags & TX_CTRL_MIC_ROOM)
-			skb_trim(skb, skb->len - IEEE80211_CCMP_MIC_LEN);
+		skb_trim(skb, skb->len - tx_ctrl->mic_room);
 
 		/* Remove H/W dma header */
 		dma_data = (struct pcie_dma_data *)skb->data;
@@ -639,8 +638,12 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 		}
 
 		pcie_tx_encapsulate_frame(priv, skb, k_conf);
-		if (k_conf && k_conf->cipher == WLAN_CIPHER_SUITE_CCMP)
-			mic_room = IEEE80211_CCMP_MIC_LEN;
+		if (k_conf &&
+		    (k_conf->cipher == WLAN_CIPHER_SUITE_CCMP ||
+		     k_conf->cipher == WLAN_CIPHER_SUITE_CCMP_256 ||
+		     k_conf->cipher == WLAN_CIPHER_SUITE_GCMP ||
+		     k_conf->cipher == WLAN_CIPHER_SUITE_GCMP_256))
+			mic_room = k_conf->icv_len;
 	} else {
 		tid = qos & 0x7;
 		if (sta && sta->deflink.ht_cap.ht_supported && !eapol_frame &&
@@ -717,8 +720,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 	tx_ctrl->tx_que_priority = tx_que_priority;
 	tx_ctrl->hdrlen = ieee80211_hdrlen(wh->frame_control);
 	tx_ctrl->flags = 0;
-	if (mic_room)
-		tx_ctrl->flags |= TX_CTRL_MIC_ROOM;
+	tx_ctrl->mic_room = mic_room;
 	if (status_sent)
 		tx_ctrl->flags |= TX_CTRL_STATUS_SENT;
 	tx_ctrl->qos = qos;

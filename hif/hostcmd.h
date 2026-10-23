@@ -136,6 +136,9 @@
 #define KEY_TYPE_ID_WEP                         0x00
 #define KEY_TYPE_ID_TKIP                        0x01
 #define KEY_TYPE_ID_AES	                        0x02
+#define KEY_TYPE_ID_CCMP_256                    0x04
+#define KEY_TYPE_ID_GCMP                        0x05
+#define KEY_TYPE_ID_GCMP_256                    0x06
 
 /* Group key for RX only */
 #define ENCR_KEY_FLAG_RXGROUPKEY                0x00000002

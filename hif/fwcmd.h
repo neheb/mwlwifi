@@ -61,6 +61,9 @@ enum encr_type {
 	ENCR_TYPE_TKIP = 4,
 	ENCR_TYPE_AES = 6,
 	ENCR_TYPE_MIX = 7,
+	ENCR_TYPE_CCMP_256 = 9,
+	ENCR_TYPE_GCMP = 10,
+	ENCR_TYPE_GCMP_256 = 11,
 };
 
 char *mwl_fwcmd_get_cmd_string(unsigned short cmd);

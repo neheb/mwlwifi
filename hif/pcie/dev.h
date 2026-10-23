@@ -798,11 +798,12 @@ static inline void pcie_tx_encapsulate_frame(struct mwl_priv *priv,
 	 * - WEP: 4 trailer bytes (ICV)
 	 * - TKIP: 12 trailer bytes (8 MIC + 4 ICV)
 	 * - CCMP: 8 trailer bytes (MIC)
+	 * - CCMP-256, GCMP, GCMP-256: 16 trailer bytes (MIC)
 	 */
 
 	if (k_conf) {
 		/* With IEEE80211_KEY_FLAG_GENERATE_IV_MGMT, mac80211 has
-		 * already inserted the CCMP header.
+		 * already inserted the CCMP/GCMP header.
 		 */
 		if (!(ieee80211_is_mgmt(wh->frame_control) &&
 		      (k_conf->flags & IEEE80211_KEY_FLAG_GENERATE_IV_MGMT)))
@@ -817,7 +818,14 @@ static inline void pcie_tx_encapsulate_frame(struct mwl_priv *priv,
 			data_pad = 12;
 			break;
 		case WLAN_CIPHER_SUITE_CCMP:
-			data_pad = 8;
+			data_pad = IEEE80211_CCMP_MIC_LEN;
+			break;
+		case WLAN_CIPHER_SUITE_CCMP_256:
+			data_pad = IEEE80211_CCMP_256_MIC_LEN;
+			break;
+		case WLAN_CIPHER_SUITE_GCMP:
+		case WLAN_CIPHER_SUITE_GCMP_256:
+			data_pad = IEEE80211_GCMP_MIC_LEN;
 			break;
 		}
 	}
