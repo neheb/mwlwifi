@@ -786,12 +786,6 @@ static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
 			cpu_to_le32(ENCR_KEY_FLAG_PAIRWISE) :
 			cpu_to_le32(ENCR_KEY_FLAG_TXGROUPKEY);
 		break;
-	/* Done in software by mac80211. */
-	case WLAN_CIPHER_SUITE_AES_CMAC:
-	case WLAN_CIPHER_SUITE_BIP_CMAC_256:
-	case WLAN_CIPHER_SUITE_BIP_GMAC_128:
-	case WLAN_CIPHER_SUITE_BIP_GMAC_256:
-		return 1;
 	default:
 		return -ENOTSUPP;
 	}
@@ -2427,8 +2421,7 @@ int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 	rc = mwl_fwcmd_encryption_set_cmd_info(pcmd, addr, key);
 	if (rc) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		if (rc != 1)
-			wiphy_err(hw->wiphy, "encryption not support\n");
+		wiphy_err(hw->wiphy, "encryption not support\n");
 		return rc;
 	}
 
@@ -2522,8 +2515,7 @@ int mwl_fwcmd_encryption_remove_key(struct ieee80211_hw *hw,
 	rc = mwl_fwcmd_encryption_set_cmd_info(pcmd, addr, key);
 	if (rc) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		if (rc != 1)
-			wiphy_err(hw->wiphy, "encryption not support\n");
+		wiphy_err(hw->wiphy, "encryption not support\n");
 		return rc;
 	}
 
