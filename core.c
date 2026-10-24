@@ -45,9 +45,12 @@ static const struct ieee80211_channel mwl_channels_24[] = {
 
 static const struct ieee80211_rate mwl_rates_24[] = {
 	{ .bitrate = 10, .hw_value = 2, },
-	{ .bitrate = 20, .hw_value = 4, },
-	{ .bitrate = 55, .hw_value = 11, },
-	{ .bitrate = 110, .hw_value = 22, },
+	{ .bitrate = 20, .hw_value = 4,
+	  .flags = IEEE80211_RATE_SHORT_PREAMBLE, },
+	{ .bitrate = 55, .hw_value = 11,
+	  .flags = IEEE80211_RATE_SHORT_PREAMBLE, },
+	{ .bitrate = 110, .hw_value = 22,
+	  .flags = IEEE80211_RATE_SHORT_PREAMBLE, },
 	{ .bitrate = 220, .hw_value = 44, },
 	{ .bitrate = 60, .hw_value = 12, },
 	{ .bitrate = 90, .hw_value = 18, },
