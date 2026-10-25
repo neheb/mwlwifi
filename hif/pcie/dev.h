@@ -24,11 +24,13 @@
 #include <linux/delay.h>
 #include <linux/bitops.h>
 #include <net/mac80211.h>
+#include <net/page_pool/helpers.h>
 
 #define PCIE_DRV_NAME    KBUILD_MODNAME
 #define PCIE_DRV_VERSION "10.4.11.0"
 
 #define PCIE_MIN_BYTES_HEADROOM   64
+#define PCIE_RX_HEADROOM          (NET_SKB_PAD + PCIE_MIN_BYTES_HEADROOM)
 #define PCIE_MIN_TX_HEADROOM_KF2  96
 #define PCIE_NUM_OF_DESC_DATA     SYSADPT_TOTAL_TX_QUEUES
 #define PCIE_AMPDU_QUEUES         4
@@ -196,7 +198,7 @@ struct pcie_rx_desc {
 } __packed;
 
 struct pcie_rx_hndl {
-	struct sk_buff *psk_buff;    /* associated sk_buff for Linux       */
+	struct page *page;           /* page_pool page holding the buffer  */
 	struct pcie_rx_desc *pdesc;
 	struct pcie_rx_hndl *pnext;
 };
@@ -258,6 +260,7 @@ struct pcie_dma_data {
 #define MACREG_A2HRIC_BIT_MASK_NDP ISR_SRC_BITS_NDP
 
 #define MIN_BYTES_RX_HEADROOM  (64 + 2)
+#define RX_HEADROOM_NDP        (NET_SKB_PAD + MIN_BYTES_RX_HEADROOM)
 #define AMPDU_QUEUES_NDP       (SYSADPT_MAX_STA_SC4 * \
 				SYSADPT_MAX_TID)
 #define MAX_NUM_TX_DESC        1024
@@ -486,7 +489,7 @@ struct pcie_desc_data_ndp {
 	/* mac80211 already has the status of the skb */
 	DECLARE_BITMAP(tx_status_sent, MAX_TX_RING_SEND_SIZE);
 	u32 tx_vbuflist_idx;              /* idx to empty slot in tx_vbuflist*/
-	struct sk_buff *rx_vbuflist[MAX_NUM_RX_DESC];
+	struct page *rx_vbuflist[MAX_NUM_RX_DESC];
 	struct tx_ring_done *ptx_ring_done;
 	dma_addr_t pphys_tx_ring_done; /* ptr to first TX done desc (phys.)  */
 	struct rx_ring_done *prx_ring_done;
@@ -587,13 +590,12 @@ struct pcie_priv {
 	/* NAPI */
 	struct net_device *napi_dev;
 	struct napi_struct napi;
-	struct tasklet_struct rx_task;
+	struct page_pool *rx_page_pool;
 	unsigned int tx_head_room;
 	int txq_limit;
 	int txq_wake_threshold;
 	bool is_tx_done_schedule;
 	int recv_limit;
-	bool is_rx_schedule;
 
 	/* various descriptor data */
 	/* for tx descriptor data  */
@@ -608,10 +610,7 @@ struct pcie_priv {
 	int tx_done_timer_cnt;
 	bool data_tasks_killed;
 	struct ieee80211_sta *sta_link[SYSADPT_MAX_STA_SC4 + 1];
-	struct sk_buff_head rx_skb_trace;
 	struct ndp_rx_counter rx_cnts;
-	u32 rx_skb_unlink_err;
-	u32 signature_err;
 	u32 recheck_rxringdone;
 	u32 acnt_busy;
 	u32 acnt_wrap;
@@ -1017,6 +1016,52 @@ static inline void pcie_rx_remove_dma_header(struct sk_buff *skb, __le16 qos)
 
 	if (hdrlen != sizeof(*dma_data))
 		skb_pull(skb, sizeof(*dma_data) - hdrlen);
+}
+
+/* RX buffers are page_pool pages, each holding one frame: headroom, then
+ * the buffer the firmware DMAs into, then room for skb_shared_info so the
+ * page can become an skb head without copying.
+ */
+static inline struct page_pool *pcie_rx_create_page_pool(struct pcie_priv *pcie_priv,
+							 unsigned int pool_size,
+							 unsigned int headroom,
+							 unsigned int buf_size)
+{
+	struct page_pool_params pp_params = {
+		.flags = PP_FLAG_DMA_MAP | PP_FLAG_DMA_SYNC_DEV,
+		.order = get_order(SKB_HEAD_ALIGN(headroom + buf_size)),
+		.pool_size = pool_size,
+		.nid = dev_to_node(&pcie_priv->pdev->dev),
+		.dev = &pcie_priv->pdev->dev,
+		.napi = &pcie_priv->napi,
+		.dma_dir = DMA_FROM_DEVICE,
+		.offset = headroom,
+		.max_len = buf_size,
+	};
+
+	return page_pool_create(&pp_params);
+}
+
+static inline dma_addr_t pcie_rx_page_dma(struct page_pool *pool,
+					  struct page *page)
+{
+	return page_pool_get_dma_addr(page) + pool->p.offset;
+}
+
+/* Turn a received page into an skb whose data starts at the DMA buffer. */
+static inline struct sk_buff *pcie_rx_build_skb(struct page_pool *pool,
+						struct page *page)
+{
+	struct sk_buff *skb;
+
+	skb = napi_build_skb(page_address(page), PAGE_SIZE << pool->p.order);
+	if (!skb)
+		return NULL;
+
+	skb_mark_for_recycle(skb);
+	skb_reserve(skb, pool->p.offset);
+
+	return skb;
 }
 
 static inline void pcie_mask_int(struct pcie_priv *pcie_priv,

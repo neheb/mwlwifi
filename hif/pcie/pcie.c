@@ -792,13 +792,12 @@ static int pcie_init_ndp(struct ieee80211_hw *hw)
 		     pcie_tx_skbs_ndp, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->tx_task);
 	spin_lock_init(&pcie_priv->tx_desc_lock);
-	tasklet_init(&pcie_priv->rx_task,
-		     pcie_rx_recv_ndp, (unsigned long)hw);
-	tasklet_disable(&pcie_priv->rx_task);
+	pcie_priv->napi_dev = alloc_netdev_dummy(0);
+	if (!pcie_priv->napi_dev)
+		return -ENOMEM;
+	netif_napi_add(pcie_priv->napi_dev, &pcie_priv->napi, pcie_rx_poll_ndp);
 	pcie_priv->txq_limit = TX_QUEUE_LIMIT;
 	pcie_priv->txq_wake_threshold = TX_WAKE_Q_THRESHOLD;
-	pcie_priv->recv_limit = MAX_NUM_RX_DESC;
-	pcie_priv->is_rx_schedule = false;
 	pcie_priv->data_tasks_killed = false;
 
 	rc = pcie_tx_init_ndp(hw);
@@ -862,6 +861,8 @@ err_mwl_rx_init:
 	pcie_tx_deinit_ndp(hw);
 
 err_mwl_tx_init:
+	netif_napi_del(&pcie_priv->napi);
+	free_netdev(pcie_priv->napi_dev);
 
 	wiphy_err(hw->wiphy, "%s: init fail\n", PCIE_DRV_NAME);
 
@@ -881,13 +882,13 @@ static void pcie_deinit_ndp(struct ieee80211_hw *hw)
 	 * meantime. Let them run, as no-ops, so they can be killed.
 	 */
 	pcie_priv->data_tasks_killed = true;
-	tasklet_enable(&pcie_priv->rx_task);
 	tasklet_enable(&pcie_priv->tx_task);
-	tasklet_kill(&pcie_priv->rx_task);
 	tasklet_kill(&pcie_priv->tx_task);
 
 	pcie_rx_deinit_ndp(hw);
 	pcie_tx_deinit_ndp(hw);
+	netif_napi_del(&pcie_priv->napi);
+	free_netdev(pcie_priv->napi_dev);
 }
 
 static int pcie_get_info_ndp(struct ieee80211_hw *hw, char *buf, size_t size)
@@ -903,8 +904,6 @@ static int pcie_get_info_ndp(struct ieee80211_hw *hw, char *buf, size_t size)
 			 pcie_priv->iobase1);
 	len += scnprintf(p + len, size - len,
 			 "tx limit: %d\n", pcie_priv->txq_limit);
-	len += scnprintf(p + len, size - len,
-			 "rx limit: %d\n", pcie_priv->recv_limit);
 	return len;
 }
 
@@ -947,12 +946,6 @@ static int pcie_get_rx_status_ndp(struct ieee80211_hw *hw, char *buf,
 			 readl(pcie_priv->iobase1 + MACREG_REG_RXDONETAIL));
 	len += scnprintf(p + len, size - len, "rx_desc_head: %d\n",
 			 readl(pcie_priv->iobase1 + MACREG_REG_RXDESCHEAD));
-	len += scnprintf(p + len, size - len, "rx_skb_trace: %d\n",
-			 skb_queue_len(&pcie_priv->rx_skb_trace));
-	len += scnprintf(p + len, size - len, "rx_skb_unlink_err: %d\n",
-			 pcie_priv->rx_skb_unlink_err);
-	len += scnprintf(p + len, size - len, "signature_err: %d\n",
-			 pcie_priv->signature_err);
 	len += scnprintf(p + len, size - len, "recheck_rxringdone: %d\n",
 			 pcie_priv->recheck_rxringdone);
 	len += scnprintf(p + len, size - len, "fast_data_cnt: %d\n",
@@ -990,7 +983,7 @@ static void pcie_enable_data_tasks_ndp(struct ieee80211_hw *hw)
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 
 	tasklet_enable(&pcie_priv->tx_task);
-	tasklet_enable(&pcie_priv->rx_task);
+	napi_enable(&pcie_priv->napi);
 }
 
 static void pcie_disable_data_tasks_ndp(struct ieee80211_hw *hw)
@@ -999,7 +992,8 @@ static void pcie_disable_data_tasks_ndp(struct ieee80211_hw *hw)
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 
 	tasklet_disable(&pcie_priv->tx_task);
-	tasklet_disable(&pcie_priv->rx_task);
+	napi_synchronize(&pcie_priv->napi);
+	napi_disable(&pcie_priv->napi);
 }
 
 static irqreturn_t pcie_isr_ndp(struct ieee80211_hw *hw)
@@ -1023,12 +1017,11 @@ static irqreturn_t pcie_isr_ndp(struct ieee80211_hw *hw)
 			ieee80211_queue_work(hw, &priv->account_handle);
 
 		if (int_status & MACREG_A2HRIC_RX_DONE_HEAD_RDY) {
-			if (!pcie_priv->is_rx_schedule) {
+			if (napi_schedule_prep(&pcie_priv->napi)) {
 				pcie_mask_int(pcie_priv,
 					      MACREG_A2HRIC_RX_DONE_HEAD_RDY,
 					      false);
-				tasklet_schedule(&pcie_priv->rx_task);
-				pcie_priv->is_rx_schedule = true;
+				__napi_schedule(&pcie_priv->napi);
 			}
 		}
 

@@ -53,6 +53,17 @@ static int pcie_rx_ring_alloc_ndp(struct mwl_priv *priv)
 	if (!desc->prx_ring_done)
 		goto err_no_mem;
 	memset(desc->prx_ring_done, 0x00, MAX_NUM_RX_RING_DONE_BYTES);
+
+	pcie_priv->rx_page_pool =
+		pcie_rx_create_page_pool(pcie_priv, MAX_NUM_RX_DESC,
+					 RX_HEADROOM_NDP, MAX_AGGR_SIZE);
+	if (IS_ERR(pcie_priv->rx_page_pool)) {
+		int rc = PTR_ERR(pcie_priv->rx_page_pool);
+
+		pcie_priv->rx_page_pool = NULL;
+		wiphy_err(priv->hw->wiphy, "cannot create page pool\n");
+		return rc;
+	}
 	return 0;
 
 err_no_mem:
@@ -65,42 +76,26 @@ static int pcie_rx_ring_init_ndp(struct mwl_priv *priv)
 {
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
+	struct page_pool *pool = pcie_priv->rx_page_pool;
 	int i;
-	struct sk_buff *psk_buff;
-	dma_addr_t dma;
+	struct page *page;
 
-	skb_queue_head_init(&pcie_priv->rx_skb_trace);
 	if (desc->prx_ring) {
 		desc->rx_buf_size = MAX_AGGR_SIZE;
 
 		for (i = 0; i < MAX_NUM_RX_DESC; i++) {
-			psk_buff = __alloc_skb(desc->rx_buf_size + NET_SKB_PAD,
-					       GFP_ATOMIC, SKB_ALLOC_RX,
-					       NUMA_NO_NODE);
-			skb_reserve(psk_buff, NET_SKB_PAD);
-			if (!psk_buff) {
+			page = page_pool_dev_alloc_pages(pool);
+			if (!page) {
 				wiphy_err(priv->hw->wiphy,
-					  "rxdesc %i: no skbuff available\n",
+					  "rxdesc %i: no page available\n",
 					  i);
 				return -ENOMEM;
 			}
-			skb_reserve(psk_buff, MIN_BYTES_RX_HEADROOM);
 
-			dma = dma_map_single(&(pcie_priv->pdev)->dev,
-					     psk_buff->data,
-					     desc->rx_buf_size,
-					     DMA_FROM_DEVICE);
-			if (dma_mapping_error(&(pcie_priv->pdev)->dev, dma)) {
-				wiphy_err(priv->hw->wiphy,
-					  "failed to map pci memory!\n");
-				return -ENOMEM;
-			}
-
-			desc->rx_vbuflist[i] = psk_buff;
+			desc->rx_vbuflist[i] = page;
 			desc->prx_ring[i].user = cpu_to_le32(i);
-			desc->prx_ring[i].data = cpu_to_le32(dma);
-			*((u32 *)&psk_buff->cb[16]) = 0xdeadbeef;
-			skb_queue_tail(&pcie_priv->rx_skb_trace, psk_buff);
+			desc->prx_ring[i].data =
+				cpu_to_le32(pcie_rx_page_dma(pool, page));
 		}
 
 		writel(1023, pcie_priv->iobase1 + MACREG_REG_RXDESCHEAD);
@@ -120,15 +115,12 @@ static void pcie_rx_ring_cleanup_ndp(struct mwl_priv *priv)
 	if (desc->prx_ring) {
 		for (i = 0; i < MAX_NUM_RX_DESC; i++) {
 			if (desc->rx_vbuflist[i]) {
-				dma_unmap_single(&(pcie_priv->pdev)->dev,
-						 le32_to_cpu(
-						 desc->prx_ring[i].data),
-						 desc->rx_buf_size,
-						 DMA_FROM_DEVICE);
+				page_pool_put_full_page(pcie_priv->rx_page_pool,
+							desc->rx_vbuflist[i],
+							false);
 				desc->rx_vbuflist[i] = NULL;
 			}
 		}
-		skb_queue_purge(&pcie_priv->rx_skb_trace);
 	}
 }
 
@@ -153,6 +145,9 @@ static void pcie_rx_ring_free_ndp(struct mwl_priv *priv)
 				  desc->pphys_rx_ring_done);
 		desc->prx_ring_done = NULL;
 	}
+
+	page_pool_destroy(pcie_priv->rx_page_pool);
+	pcie_priv->rx_page_pool = NULL;
 }
 
 static inline void pcie_rx_update_ndp_cnts(struct mwl_priv *priv, u32 ctrl)
@@ -323,7 +318,7 @@ static inline void pcie_rx_process_fast_data(struct mwl_priv *priv,
 		memcpy(skb_push(skb, hdrlen), &hdr, hdrlen);
 
 	status->flag |= RX_FLAG_DUP_VALIDATED;
-	ieee80211_rx(priv->hw, skb);
+	ieee80211_rx_napi(priv->hw, NULL, skb, &pcie_priv->napi);
 
 	return;
 drop_packet:
@@ -335,6 +330,7 @@ static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 					     struct sk_buff *skb,
 					     bool bad_mic, u8 signal)
 {
+	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct ieee80211_rx_status *status;
 	struct ieee80211_hdr *wh;
 	struct mwl_vif *mwl_vif = NULL;
@@ -394,46 +390,15 @@ static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 			if (monitor_skb) {
 				IEEE80211_SKB_RXCB(monitor_skb)->flag |= RX_FLAG_ONLY_MONITOR;
 				((struct ieee80211_hdr *)monitor_skb->data)->frame_control &= ~__cpu_to_le16(IEEE80211_FCTL_PROTECTED);
-				ieee80211_rx(priv->hw, monitor_skb);
+				ieee80211_rx_napi(priv->hw, NULL, monitor_skb,
+						  &pcie_priv->napi);
 			}
 			status->flag |= RX_FLAG_SKIP_MONITOR;
 		}
 	}
 
 	status->flag |= RX_FLAG_DUP_VALIDATED;
-	ieee80211_rx(priv->hw, skb);
-}
-
-static inline int pcie_rx_refill_ndp(struct mwl_priv *priv, u32 buf_idx)
-{
-	struct pcie_priv *pcie_priv = priv->hif.priv;
-	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
-	struct sk_buff *psk_buff;
-	dma_addr_t dma;
-
-	psk_buff = __alloc_skb(desc->rx_buf_size + NET_SKB_PAD, GFP_ATOMIC,
-			       SKB_ALLOC_RX, NUMA_NO_NODE);
-	skb_reserve(psk_buff, NET_SKB_PAD);
-	if (!psk_buff)
-		return -ENOMEM;
-	skb_reserve(psk_buff, MIN_BYTES_RX_HEADROOM);
-
-	dma = dma_map_single(&(pcie_priv->pdev)->dev,
-			     psk_buff->data,
-			     desc->rx_buf_size,
-			     DMA_FROM_DEVICE);
-	if (dma_mapping_error(&(pcie_priv->pdev)->dev, dma)) {
-		wiphy_err(priv->hw->wiphy,
-			  "refill: failed to map pci memory!\n");
-		return -ENOMEM;
-	}
-
-	desc->rx_vbuflist[buf_idx] = psk_buff;
-	desc->prx_ring[buf_idx].data = cpu_to_le32(dma);
-	*((u32 *)&psk_buff->cb[16]) = 0xdeadbeef;
-	skb_queue_tail(&pcie_priv->rx_skb_trace, psk_buff);
-
-	return 0;
+	ieee80211_rx_napi(priv->hw, NULL, skb, &pcie_priv->napi);
 }
 
 int pcie_rx_init_ndp(struct ieee80211_hw *hw)
@@ -467,11 +432,12 @@ void pcie_rx_deinit_ndp(struct ieee80211_hw *hw)
 	pcie_rx_ring_free_ndp(priv);
 }
 
-void pcie_rx_recv_ndp(unsigned long data)
+int pcie_rx_poll_ndp(struct napi_struct *napi, int budget)
 {
-	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
-	struct mwl_priv *priv = hw->priv;
-	struct pcie_priv *pcie_priv = priv->hif.priv;
+	struct pcie_priv *pcie_priv = container_of(napi, struct pcie_priv, napi);
+	struct mwl_priv *priv = pcie_priv->mwl_priv;
+	struct ieee80211_hw *hw = priv->hw;
+	struct page_pool *pool = pcie_priv->rx_page_pool;
 	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
 	struct rx_ring_done *prx_ring_done;
 	struct pcie_rx_desc_ndp *prx_desc;
@@ -479,6 +445,7 @@ void pcie_rx_recv_ndp(unsigned long data)
 	u32 rx_done_tail;
 	u32 rx_desc_head;
 	struct sk_buff *psk_buff;
+	struct page *page, *new_page;
 	u32 buf_idx;
 	u32 rx_cnt;
 	u32 ctrl, ctrl_case;
@@ -489,8 +456,10 @@ void pcie_rx_recv_ndp(unsigned long data)
 	struct pcie_dma_data *dma_data;
 	u8 signal;
 
-	if (pcie_priv->data_tasks_killed)
-		return;
+	if (pcie_priv->data_tasks_killed) {
+		napi_complete(napi);
+		return 0;
+	}
 
 	rx_done_head = readl(pcie_priv->iobase1 + MACREG_REG_RXDONEHEAD);
 	rx_done_tail = readl(pcie_priv->iobase1 + MACREG_REG_RXDONETAIL);
@@ -498,7 +467,7 @@ void pcie_rx_recv_ndp(unsigned long data)
 	rx_cnt = 0;
 
 	while ((rx_done_tail != rx_done_head) &&
-	       (rx_cnt < pcie_priv->recv_limit)) {
+	       (rx_cnt < budget)) {
 recheck:
 		prx_ring_done = &desc->prx_ring_done[rx_done_tail];
 		wmb(); /*Data Memory Barrier*/
@@ -511,29 +480,25 @@ recheck:
 		prx_ring_done->user = cpu_to_le32(0xdeadbeef);
 		rx_done_tail++;
 		prx_desc = &desc->prx_ring[buf_idx];
-		if (!prx_desc->data)
-			wiphy_err(hw->wiphy, "RX desc data is NULL\n");
-		psk_buff = desc->rx_vbuflist[buf_idx];
-		if (!psk_buff) {
-			wiphy_err(hw->wiphy, "RX socket buffer is NULL\n");
+		page = desc->rx_vbuflist[buf_idx];
+
+		/* Replace the buffer before handing this one up. If there
+		 * is no replacement, drop the frame and reuse its buffer.
+		 */
+		new_page = page_pool_dev_alloc_pages(pool);
+		if (unlikely(!new_page))
+			goto out;
+
+		desc->rx_vbuflist[buf_idx] = new_page;
+		prx_desc->data = cpu_to_le32(pcie_rx_page_dma(pool, new_page));
+
+		page_pool_dma_sync_for_cpu(pool, page, 0, desc->rx_buf_size);
+
+		psk_buff = pcie_rx_build_skb(pool, page);
+		if (unlikely(!psk_buff)) {
+			page_pool_recycle_direct(pool, page);
 			goto out;
 		}
-		if (*((u32 *)&psk_buff->cb[16]) != 0xdeadbeef) {
-			pcie_priv->signature_err++;
-			break;
-		}
-		if (psk_buff->next && psk_buff->prev) {
-			skb_unlink(psk_buff, &pcie_priv->rx_skb_trace);
-			*((u32 *)&psk_buff->cb[16]) = 0xbeefdead;
-		} else {
-			pcie_priv->rx_skb_unlink_err++;
-			break;
-		}
-
-		dma_unmap_single(&(pcie_priv->pdev)->dev,
-				 le32_to_cpu(prx_desc->data),
-				 desc->rx_buf_size,
-				 DMA_FROM_DEVICE);
 
 		bad_mic = false;
 		ctrl = le32_to_cpu(prx_ring_done->ctrl);
@@ -550,14 +515,14 @@ recheck:
 			pktlen = psk_buff->data[12] << 8 | psk_buff->data[13];
 			pktlen += ETH_HLEN;
 
-			if (skb_tailroom(psk_buff) >= pktlen) {
+			if (pktlen <= desc->rx_buf_size) {
 				skb_put(psk_buff, pktlen);
 				pcie_rx_process_fast_data(priv, psk_buff,
 							  stnid);
 			} else {
 				wiphy_err(hw->wiphy,
 					  "fast: space %d(%d) is not enough\n",
-					  skb_tailroom(psk_buff), pktlen);
+					  desc->rx_buf_size, pktlen);
 				dev_kfree_skb_any(psk_buff);
 			}
 			break;
@@ -592,7 +557,7 @@ recheck:
 				memset(&dma_data->data, 0, 4);
 				pktlen += 4;
 			}
-			if (skb_tailroom(psk_buff) >= pktlen) {
+			if (pktlen <= desc->rx_buf_size) {
 				skb_put(psk_buff, pktlen);
 				skb_pull(psk_buff, sizeof(*rx_info));
 				signal = ((le32_to_cpu(rx_info->rssi_x) >>
@@ -603,7 +568,7 @@ recheck:
 			} else {
 				wiphy_err(hw->wiphy,
 					  "slow: space %d(%d) is not enough\n",
-					  skb_tailroom(psk_buff), pktlen);
+					  desc->rx_buf_size, pktlen);
 				dev_kfree_skb_any(psk_buff);
 			}
 			break;
@@ -614,8 +579,6 @@ recheck:
 			break;
 		}
 out:
-		pcie_rx_refill_ndp(priv, buf_idx);
-
 		if (rx_done_tail >= MAX_RX_RING_DONE_SIZE)
 			rx_done_tail = 0;
 
@@ -630,6 +593,8 @@ out:
 	writel(rx_done_tail, pcie_priv->iobase1 + MACREG_REG_RXDONETAIL);
 	writel(rx_desc_head, pcie_priv->iobase1 + MACREG_REG_RXDESCHEAD);
 
-	pcie_mask_int(pcie_priv, MACREG_A2HRIC_RX_DONE_HEAD_RDY, true);
-	pcie_priv->is_rx_schedule = false;
+	if (rx_cnt < budget && napi_complete_done(napi, rx_cnt))
+		pcie_mask_int(pcie_priv, MACREG_A2HRIC_RX_DONE_HEAD_RDY, true);
+
+	return rx_cnt;
 }

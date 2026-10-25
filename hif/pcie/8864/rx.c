@@ -42,6 +42,7 @@ static int pcie_rx_ring_alloc(struct mwl_priv *priv)
 {
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct pcie_desc_data *desc;
+	int rc;
 
 	desc = &pcie_priv->desc_data[0];
 
@@ -61,47 +62,43 @@ static int pcie_rx_ring_alloc(struct mwl_priv *priv)
 	desc->rx_hndl = kzalloc(MAX_NUM_RX_HNDL_BYTES, GFP_KERNEL);
 
 	if (!desc->rx_hndl) {
-		dma_free_coherent(priv->dev,
-				  MAX_NUM_RX_RING_BYTES,
-				  desc->prx_ring,
-				  desc->pphys_rx_ring);
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto err_free_ring;
+	}
+
+	pcie_priv->rx_page_pool =
+		pcie_rx_create_page_pool(pcie_priv, PCIE_MAX_NUM_RX_DESC,
+					 PCIE_RX_HEADROOM,
+					 SYSADPT_MAX_AGGR_SIZE);
+	if (IS_ERR(pcie_priv->rx_page_pool)) {
+		rc = PTR_ERR(pcie_priv->rx_page_pool);
+		pcie_priv->rx_page_pool = NULL;
+		wiphy_err(priv->hw->wiphy, "cannot create page pool\n");
+		goto err_free_hndl;
 	}
 
 	return 0;
+
+err_free_hndl:
+	kfree(desc->rx_hndl);
+	desc->rx_hndl = NULL;
+err_free_ring:
+	dma_free_coherent(priv->dev,
+			  MAX_NUM_RX_RING_BYTES,
+			  desc->prx_ring,
+			  desc->pphys_rx_ring);
+	desc->prx_ring = NULL;
+	return rc;
 }
 
-static struct sk_buff *pcie_rx_alloc_skb(struct mwl_priv *priv,
-					 dma_addr_t *dma)
-{
-	struct pcie_priv *pcie_priv = priv->hif.priv;
-	struct pcie_desc_data *desc = &pcie_priv->desc_data[0];
-	struct sk_buff *skb;
-
-	/* The firmware may fill all of rx_buf_size after the headroom. */
-	skb = dev_alloc_skb(desc->rx_buf_size + PCIE_MIN_BYTES_HEADROOM);
-	if (!skb)
-		return NULL;
-
-	skb_reserve(skb, PCIE_MIN_BYTES_HEADROOM);
-
-	*dma = dma_map_single(&(pcie_priv->pdev)->dev, skb->data,
-			      desc->rx_buf_size, DMA_FROM_DEVICE);
-	if (dma_mapping_error(&(pcie_priv->pdev)->dev, *dma)) {
-		dev_kfree_skb_any(skb);
-		wiphy_err(priv->hw->wiphy,
-			  "failed to map pci memory!\n");
-		return NULL;
-	}
-
-	return skb;
-}
-
-static void pcie_rx_set_buff(struct pcie_desc_data *desc,
+static void pcie_rx_set_buff(struct pcie_priv *pcie_priv,
+			     struct pcie_desc_data *desc,
 			     struct pcie_rx_hndl *rx_hndl,
-			     struct sk_buff *skb, dma_addr_t dma)
+			     struct page *page)
 {
-	rx_hndl->psk_buff = skb;
+	dma_addr_t dma = pcie_rx_page_dma(pcie_priv->rx_page_pool, page);
+
+	rx_hndl->page = page;
 	rx_hndl->pdesc->status = EAGLE_RXD_STATUS_OK;
 	rx_hndl->pdesc->qos_ctrl = 0x0000;
 	rx_hndl->pdesc->channel = 0x00;
@@ -116,8 +113,7 @@ static int pcie_rx_ring_init(struct mwl_priv *priv)
 	struct pcie_desc_data *desc;
 	int i;
 	struct pcie_rx_hndl *rx_hndl;
-	struct sk_buff *skb;
-	dma_addr_t dma;
+	struct page *page;
 	u32 val;
 
 	desc = &pcie_priv->desc_data[0];
@@ -129,15 +125,15 @@ static int pcie_rx_ring_init(struct mwl_priv *priv)
 			rx_hndl = &desc->rx_hndl[i];
 			rx_hndl->pdesc = &desc->prx_ring[i];
 
-			skb = pcie_rx_alloc_skb(priv, &dma);
-			if (!skb) {
+			page = page_pool_dev_alloc_pages(pcie_priv->rx_page_pool);
+			if (!page) {
 				wiphy_err(priv->hw->wiphy,
-					  "rxdesc %i: no skbuff available\n",
+					  "rxdesc %i: no page available\n",
 					  i);
 				return -ENOMEM;
 			}
 
-			pcie_rx_set_buff(desc, rx_hndl, skb, dma);
+			pcie_rx_set_buff(pcie_priv, desc, rx_hndl, page);
 			desc->prx_ring[i].rx_control =
 				EAGLE_RXD_CTRL_DRIVER_OWN;
 			val = (u32)desc->pphys_rx_ring +
@@ -172,24 +168,12 @@ static void pcie_rx_ring_cleanup(struct mwl_priv *priv)
 	if (desc->prx_ring) {
 		for (i = 0; i < PCIE_MAX_NUM_RX_DESC; i++) {
 			rx_hndl = &desc->rx_hndl[i];
-			if (!rx_hndl->psk_buff)
+			if (!rx_hndl->page)
 				continue;
 
-			dma_unmap_single(&(pcie_priv->pdev)->dev,
-					 le32_to_cpu
-					 (rx_hndl->pdesc->pphys_buff_data),
-					 desc->rx_buf_size,
-					 DMA_FROM_DEVICE);
-
-			wiphy_debug(priv->hw->wiphy,
-				    "unmapped+free'd %i 0x%p 0x%x %i\n",
-				    i, rx_hndl->psk_buff->data,
-				    le32_to_cpu(
-				    rx_hndl->pdesc->pphys_buff_data),
-				    desc->rx_buf_size);
-
-			dev_kfree_skb_any(rx_hndl->psk_buff);
-			rx_hndl->psk_buff = NULL;
+			page_pool_put_full_page(pcie_priv->rx_page_pool,
+						rx_hndl->page, false);
+			rx_hndl->page = NULL;
 		}
 	}
 }
@@ -216,6 +200,9 @@ static void pcie_rx_ring_free(struct mwl_priv *priv)
 	desc->rx_hndl = NULL;
 
 	desc->pnext_rx_hndl = NULL;
+
+	page_pool_destroy(pcie_priv->rx_page_pool);
+	pcie_priv->rx_page_pool = NULL;
 }
 
 static inline void pcie_rx_status(struct mwl_priv *priv,
@@ -362,13 +349,13 @@ int pcie_8864_poll_napi(struct napi_struct *napi, int budget)
 	struct pcie_priv *pcie_priv = container_of(napi, struct pcie_priv, napi);
 	struct mwl_priv *priv = pcie_priv->mwl_priv;
 	struct ieee80211_hw *hw = priv->hw;
+	struct page_pool *pool = pcie_priv->rx_page_pool;
 	struct pcie_desc_data *desc;
 	struct pcie_rx_hndl *curr_hndl;
 	int work_done = 0;
 	struct sk_buff *prx_skb = NULL;
-	struct sk_buff *new_skb;
 	struct sk_buff *monitor_skb;
-	dma_addr_t dma;
+	struct page *page, *new_page;
 	int pkt_len;
 	int hdrlen;
 	struct ieee80211_rx_status *status;
@@ -387,32 +374,35 @@ int pcie_8864_poll_napi(struct napi_struct *napi, int budget)
 
 	while ((curr_hndl->pdesc->rx_control == EAGLE_RXD_CTRL_DMA_OWN) &&
 	       (work_done < budget)) {
-		prx_skb = curr_hndl->psk_buff;
+		page = curr_hndl->page;
 
 		/* Replace the buffer before handing this one up. If there
 		 * is no replacement, drop the frame and reuse its buffer.
 		 */
-		new_skb = pcie_rx_alloc_skb(priv, &dma);
-		if (unlikely(!new_skb)) {
-			pcie_rx_set_buff(desc, curr_hndl, prx_skb,
-					 le32_to_cpu(curr_hndl->pdesc->pphys_buff_data));
-			goto out;
+		new_page = page_pool_dev_alloc_pages(pool);
+		if (unlikely(!new_page)) {
+			new_page = page;
+			goto refill;
 		}
 
-		dma_unmap_single(&(pcie_priv->pdev)->dev,
-				 le32_to_cpu(curr_hndl->pdesc->pphys_buff_data),
-				 desc->rx_buf_size,
-				 DMA_FROM_DEVICE);
 		pkt_len = le16_to_cpu(curr_hndl->pdesc->pkt_len);
 
-		if (unlikely(skb_tailroom(prx_skb) < pkt_len)) {
-			dev_kfree_skb_any(prx_skb);
+		if (unlikely(pkt_len > desc->rx_buf_size)) {
+			page_pool_recycle_direct(pool, page);
 			goto refill;
 		}
 
 		if (unlikely(curr_hndl->pdesc->channel !=
 		    hw->conf.chandef.chan->hw_value)) {
-			dev_kfree_skb_any(prx_skb);
+			page_pool_recycle_direct(pool, page);
+			goto refill;
+		}
+
+		page_pool_dma_sync_for_cpu(pool, page, 0, pkt_len);
+
+		prx_skb = pcie_rx_build_skb(pool, page);
+		if (unlikely(!prx_skb)) {
+			page_pool_recycle_direct(pool, page);
 			goto refill;
 		}
 
@@ -486,8 +476,7 @@ int pcie_8864_poll_napi(struct napi_struct *napi, int budget)
 
 		ieee80211_rx_napi(hw, NULL, prx_skb, &pcie_priv->napi);
 refill:
-		pcie_rx_set_buff(desc, curr_hndl, new_skb, dma);
-out:
+		pcie_rx_set_buff(pcie_priv, desc, curr_hndl, new_page);
 		/* Hand the descriptor back to the firmware last. */
 		wmb();
 		curr_hndl->pdesc->rx_control = EAGLE_RXD_CTRL_DRIVER_OWN;

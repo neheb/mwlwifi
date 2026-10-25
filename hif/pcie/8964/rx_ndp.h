@@ -21,6 +21,6 @@
 
 int pcie_rx_init_ndp(struct ieee80211_hw *hw);
 void pcie_rx_deinit_ndp(struct ieee80211_hw *hw);
-void pcie_rx_recv_ndp(unsigned long data);
+int pcie_rx_poll_ndp(struct napi_struct *napi, int budget);
 
 #endif /* _RX_NDP_H_ */
