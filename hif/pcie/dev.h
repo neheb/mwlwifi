@@ -270,7 +270,10 @@ struct pcie_dma_data {
 #define MAX_RX_RING_SEND_SIZE  MAX_NUM_RX_DESC
 #define MAX_RX_RING_DONE_SIZE  MAX_NUM_RX_DESC
 #define DEFAULT_ACNT_RING_SIZE 0x10000
-#define MAX_AGGR_SIZE          1900
+/* The RX descriptors don't tell the firmware the buffer size, so this has
+ * to cover the largest frame it writes. The vendor driver uses 2700.
+ */
+#define MAX_AGGR_SIZE          2700
 #define TX_QUEUE_LIMIT         MAX_NUM_TX_DESC
 #define TX_WAKE_Q_THRESHOLD    (MAX_NUM_TX_DESC - 256)
 
