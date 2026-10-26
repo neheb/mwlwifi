@@ -550,7 +550,8 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 
 	tx_info = IEEE80211_SKB_CB(skb);
 	k_conf = tx_info->control.hw_key;
-	mwl_vif = mwl_dev_get_vif(tx_info->control.vif);
+	mwl_vif = tx_info->control.vif ?
+		  mwl_dev_get_vif(tx_info->control.vif) : NULL;
 	index = skb_get_queue_mapping(skb);
 	sta = control->sta;
 	sta_info = sta ? mwl_dev_get_sta(sta) : NULL;
@@ -570,6 +571,15 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 	if (ieee80211_is_mgmt(wh->frame_control)) {
 		mgmtframe = true;
 		mgmt = (struct ieee80211_mgmt *)skb->data;
+	}
+
+	/* The firmware builds the header of data frames itself, from the
+	 * queue they're sent on, so an injected data frame without a vif
+	 * can't be sent as it is.
+	 */
+	if (!mwl_vif && !mgmtframe) {
+		ieee80211_free_txskb(hw, skb);
+		return;
 	}
 
 	if (mgmtframe) {
@@ -595,7 +605,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 			tx_que_priority = PROBE_RESPONSE_TXQNUM;
 		else {
 			if ((
-			    (mwl_vif->macid == SYSADPT_NUM_OF_AP) &&
+			    mwl_vif && (mwl_vif->macid == SYSADPT_NUM_OF_AP) &&
 			    (!ieee80211_has_protected(wh->frame_control) ||
 			    (ieee80211_has_protected(wh->frame_control) &&
 			    ieee80211_is_auth(wh->frame_control)))
