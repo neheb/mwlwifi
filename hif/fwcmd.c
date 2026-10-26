@@ -517,6 +517,13 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 	if (priv->chip_type == MWL8897)
 		ok &= mwl_fwcmd_append_ie(pcmd, &ie_len, beacon->ie_wmm_ptr,
 					  beacon->ie_wmm_len);
+	/* The 88W8964 firmware cuts the RSN element from the BSS start
+	 * command of every BSS on the radio to the same length, so pass
+	 * it along with the other elements instead.
+	 */
+	if (priv->chip_type == MWL8964)
+		ok &= mwl_fwcmd_append_ie(pcmd, &ie_len, beacon->ie_rsn48_ptr,
+					  beacon->ie_rsn48_len);
 	ok &= mwl_fwcmd_append_ie(pcmd, &ie_len, beacon->ie_mde_ptr,
 				  beacon->ie_mde_len);
 	ok &= mwl_fwcmd_append_ie(pcmd, &ie_len, beacon->ie_rsnx_ptr,
@@ -572,7 +579,8 @@ static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv,
 	if (mwl_vif->beacon_info.ie_wpa_len > sizeof(pcmd->start_cmd.wpa_ie))
 		goto ielenerr;
 
-	if (mwl_vif->beacon_info.ie_rsn48_len >
+	if (priv->chip_type != MWL8964 &&
+	    mwl_vif->beacon_info.ie_rsn48_len >
 	    sizeof(pcmd->start_cmd.rsn48_ie))
 		goto ielenerr;
 
@@ -605,8 +613,10 @@ static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv,
 	memcpy(&pcmd->start_cmd.wpa_ie, mwl_vif->beacon_info.ie_wpa_ptr,
 	       mwl_vif->beacon_info.ie_wpa_len);
 
-	memcpy(&pcmd->start_cmd.rsn48_ie, mwl_vif->beacon_info.ie_rsn48_ptr,
-	       mwl_vif->beacon_info.ie_rsn48_len);
+	if (priv->chip_type != MWL8964)
+		memcpy(&pcmd->start_cmd.rsn48_ie,
+		       mwl_vif->beacon_info.ie_rsn48_ptr,
+		       mwl_vif->beacon_info.ie_rsn48_len);
 
 	memcpy(pcmd->start_cmd.b_rate_set, mwl_vif->beacon_info.b_rate_set,
 	       SYSADPT_MAX_DATA_RATES_G);
