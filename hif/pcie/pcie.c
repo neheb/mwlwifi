@@ -559,7 +559,7 @@ static irqreturn_t pcie_isr_8864(struct ieee80211_hw *hw)
 		if (int_status & MACREG_A2HRIC_BIT_CHAN_SWITCH)
 			ieee80211_queue_work(hw, &priv->chnl_switch_handle);
 
-		if (int_status & MACREG_A2HRIC_BIT_TX_WATCHDOG)
+		if (int_status & MACREG_A2HRIC_BA_WATCHDOG)
 			ieee80211_queue_work(hw, &priv->watchdog_ba_handle);
 	}
 
