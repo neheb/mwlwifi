@@ -54,6 +54,8 @@ static int pcie_rx_ring_alloc_ndp(struct mwl_priv *priv)
 		goto err_no_mem;
 	memset(desc->prx_ring_done, 0x00, MAX_NUM_RX_RING_DONE_BYTES);
 
+	BUILD_BUG_ON(SKB_HEAD_ALIGN(RX_HEADROOM_NDP + MAX_AGGR_SIZE) > PAGE_SIZE);
+
 	pcie_priv->rx_page_pool =
 		pcie_rx_create_page_pool(pcie_priv, MAX_NUM_RX_DESC,
 					 RX_HEADROOM_NDP, MAX_AGGR_SIZE);

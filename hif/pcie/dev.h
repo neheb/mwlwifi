@@ -270,7 +270,13 @@ struct pcie_dma_data {
 #define MAX_RX_RING_SEND_SIZE  MAX_NUM_RX_DESC
 #define MAX_RX_RING_DONE_SIZE  MAX_NUM_RX_DESC
 #define DEFAULT_ACNT_RING_SIZE 0x10000
-#define MAX_AGGR_SIZE          1900
+/* The RX descriptors don't tell the firmware the buffer size, so this has
+ * to cover the largest frame it writes. The vendor driver uses 2700 but
+ * __alloc_skb() rounds that up to 4096 minus overhead and headroom. This
+ * driver allocates whole pages from a page_pool so we set this to the
+ * maximum that fits in one page (also allowing for overhead and headroom).
+ */
+#define MAX_AGGR_SIZE          SKB_MAX_ORDER(RX_HEADROOM_NDP, 0)
 #define TX_QUEUE_LIMIT         MAX_NUM_TX_DESC
 #define TX_WAKE_Q_THRESHOLD    (MAX_NUM_TX_DESC - 256)
 
