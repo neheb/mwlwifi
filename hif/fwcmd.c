@@ -502,10 +502,10 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 
 	pcmd->action = cpu_to_le16(HOSTCMD_ACT_GEN_SET);
 
-	memcpy(pcmd->ie_list_ht, beacon->ie_ht_ptr, beacon->ie_ht_len);
+	memcpy(pcmd->ie_list_ht, beacon->ie_list_ht, beacon->ie_ht_len);
 	pcmd->ie_list_len_ht = cpu_to_le16(beacon->ie_ht_len);
 
-	memcpy(pcmd->ie_list_vht, beacon->ie_vht_ptr, beacon->ie_vht_len);
+	memcpy(pcmd->ie_list_vht, beacon->ie_list_vht, beacon->ie_vht_len);
 	pcmd->ie_list_len_vht = cpu_to_le16(beacon->ie_vht_len);
 
 	ok &= mwl_fwcmd_append_ie(pcmd, &ie_len, beacon->ie_meshid_ptr,
@@ -2074,8 +2074,8 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 		rx_mcs_map_mask = ((0x0000FFFF) >> (sta->deflink.rx_nss * 2))
 			<< (sta->deflink.rx_nss * 2);
 		pcmd->peer_info.vht_max_rx_mcs =
-			cpu_to_le32((*((u32 *)
-			&sta->deflink.vht_cap.vht_mcs.rx_mcs_map)) | rx_mcs_map_mask);
+			cpu_to_le32(get_unaligned_le32(
+			&sta->deflink.vht_cap.vht_mcs.rx_mcs_map) | rx_mcs_map_mask);
 		pcmd->peer_info.vht_cap = cpu_to_le32(sta->deflink.vht_cap.cap);
 		pcmd->peer_info.vht_rx_channel_width = sta->deflink.bandwidth;
 	}
@@ -2162,8 +2162,8 @@ int mwl_fwcmd_set_new_stn_add_sc4(struct ieee80211_hw *hw,
 		rx_mcs_map_mask = ((0x0000FFFF) >> (sta->deflink.rx_nss * 2))
 			<< (sta->deflink.rx_nss * 2);
 		pcmd->peer_info.vht_max_rx_mcs =
-			cpu_to_le32((*((u32 *)
-			&sta->deflink.vht_cap.vht_mcs.rx_mcs_map)) | rx_mcs_map_mask);
+			cpu_to_le32(get_unaligned_le32(
+			&sta->deflink.vht_cap.vht_mcs.rx_mcs_map) | rx_mcs_map_mask);
 		pcmd->peer_info.vht_cap = cpu_to_le32(sta->deflink.vht_cap.cap);
 		pcmd->peer_info.vht_rx_channel_width = sta->deflink.bandwidth;
 	}
@@ -3267,7 +3267,7 @@ int mwl_fwcmd_get_device_pwr_tbl(struct ieee80211_hw *hw,
 
 	device_ch_pwrtbl->channel = pcmd->channel_pwr_tbl.channel;
 	memcpy(device_ch_pwrtbl->tx_pwr, pcmd->channel_pwr_tbl.tx_pwr,
-	       priv->pwr_level);
+	       sizeof(pcmd->channel_pwr_tbl.tx_pwr));
 	device_ch_pwrtbl->dfs_capable = pcmd->channel_pwr_tbl.dfs_capable;
 	device_ch_pwrtbl->ax_ant = pcmd->channel_pwr_tbl.ax_ant;
 	device_ch_pwrtbl->cdd = pcmd->channel_pwr_tbl.cdd;

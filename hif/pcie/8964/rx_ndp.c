@@ -379,10 +379,14 @@ static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 			}
 		}
 
-		if (ieee80211_has_a4(wh->frame_control) && !priv->wds_check) {
+		if (ieee80211_has_a4(wh->frame_control) &&
+		    !READ_ONCE(priv->wds_check)) {
+			/* Set the flag before queueing: the work clears it
+			 * and may run before this function continues.
+			 */
+			WRITE_ONCE(priv->wds_check, true);
 			ether_addr_copy(priv->wds_check_sta, wh->addr2);
 			ieee80211_queue_work(priv->hw, &priv->wds_check_handle);
-			priv->wds_check = true;
 		}
 
 		if (status->flag & RX_FLAG_DECRYPTED) {
@@ -451,7 +455,9 @@ int pcie_rx_poll_ndp(struct napi_struct *napi, int budget)
 	u32 ctrl, ctrl_case;
 	bool bad_mic;
 	u16 stnid;
-	u16 pktlen;
+	u32 pktlen;
+	u32 recheck;
+	bool pending = false;
 	struct rx_info *rx_info;
 	struct pcie_dma_data *dma_data;
 	u8 signal;
@@ -461,21 +467,36 @@ int pcie_rx_poll_ndp(struct napi_struct *napi, int budget)
 		return 0;
 	}
 
-	rx_done_head = readl(pcie_priv->iobase1 + MACREG_REG_RXDONEHEAD);
-	rx_done_tail = readl(pcie_priv->iobase1 + MACREG_REG_RXDONETAIL);
-	rx_desc_head = readl(pcie_priv->iobase1 + MACREG_REG_RXDESCHEAD);
+	/* Mask the ring indices like the TX path does: they come from
+	 * device registers and index host arrays.
+	 */
+	rx_done_head = readl(pcie_priv->iobase1 + MACREG_REG_RXDONEHEAD) &
+		       (MAX_RX_RING_DONE_SIZE - 1);
+	rx_done_tail = readl(pcie_priv->iobase1 + MACREG_REG_RXDONETAIL) &
+		       (MAX_RX_RING_DONE_SIZE - 1);
+	rx_desc_head = readl(pcie_priv->iobase1 + MACREG_REG_RXDESCHEAD) &
+		       (MAX_RX_RING_SEND_SIZE - 1);
 	rx_cnt = 0;
 
 	while ((rx_done_tail != rx_done_head) &&
 	       (rx_cnt < budget)) {
-recheck:
 		prx_ring_done = &desc->prx_ring_done[rx_done_tail];
-		wmb(); /*Data Memory Barrier*/
-		if (le32_to_cpu(prx_ring_done->user) == 0xdeadbeef) {
+		/* The firmware may not have written the entry yet. Wait a
+		 * little, but don't spin in NAPI context: leave the entry
+		 * for the next poll.
+		 */
+		for (recheck = 0;
+		     le32_to_cpu(READ_ONCE(prx_ring_done->user)) == 0xdeadbeef;
+		     recheck++) {
+			if (recheck == 100) {
+				pending = true;
+				goto done;
+			}
 			pcie_priv->recheck_rxringdone++;
 			udelay(1);
-			goto recheck;
 		}
+		/* Read the rest of the entry only after its user field. */
+		dma_rmb();
 		buf_idx = le32_to_cpu(prx_ring_done->user) & 0x3fff;
 		prx_ring_done->user = cpu_to_le32(0xdeadbeef);
 		rx_done_tail++;
@@ -515,7 +536,9 @@ recheck:
 			pktlen = psk_buff->data[12] << 8 | psk_buff->data[13];
 			pktlen += ETH_HLEN;
 
-			if (pktlen <= desc->rx_buf_size) {
+			/* The fast data path reads the LLC/SNAP ethertype. */
+			if (pktlen >= ETH_HLEN + 8 &&
+			    pktlen <= desc->rx_buf_size) {
 				skb_put(psk_buff, pktlen);
 				pcie_rx_process_fast_data(priv, psk_buff,
 							  stnid);
@@ -583,15 +606,20 @@ out:
 			rx_done_tail = 0;
 
 		rx_done_head =
-			readl(pcie_priv->iobase1 + MACREG_REG_RXDONEHEAD);
+			readl(pcie_priv->iobase1 + MACREG_REG_RXDONEHEAD) &
+			(MAX_RX_RING_DONE_SIZE - 1);
 		rx_cnt++;
 	}
-
+done:
 	rx_desc_head += rx_cnt;
 	if (rx_desc_head >= MAX_RX_RING_SEND_SIZE)
 		rx_desc_head = rx_desc_head - MAX_RX_RING_SEND_SIZE;
 	writel(rx_done_tail, pcie_priv->iobase1 + MACREG_REG_RXDONETAIL);
 	writel(rx_desc_head, pcie_priv->iobase1 + MACREG_REG_RXDESCHEAD);
+
+	/* Keep polling for an entry the firmware hasn't finished. */
+	if (pending)
+		return budget;
 
 	if (rx_cnt < budget && napi_complete_done(napi, rx_cnt))
 		pcie_mask_int(pcie_priv, MACREG_A2HRIC_RX_DONE_HEAD_RDY, true);

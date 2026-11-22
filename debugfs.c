@@ -224,14 +224,18 @@ static void dump_tx_hist_su(char *p, int size, int *len, bool su, bool *printed,
 					"%s %10u, %9d, %9d, %9d, %9d, %9d\n",
 					"5.5Mbps             :", cnt, per0,
 					per1, per2, per3, per4);
-				} else {
-					sprintf(title_str,
-						"%-3dMbps             :",
-						g_rate[mcs]);
+				} else if (mcs < ARRAY_SIZE(g_rate)) {
+					scnprintf(title_str, sizeof(title_str),
+						  "%-3dMbps             :",
+						  g_rate[mcs]);
 					*len += scnprintf(p + *len, size - *len,
 					"%s %10u, %9d, %9d, %9d, %9d, %9d\n",
 					title_str, cnt, per0, per1, per2, per3,
 					per4);
+				} else {
+					*len += scnprintf(p + *len, size - *len,
+					"rate id %-3u         : %10u, %9d, %9d, %9d, %9d, %9d\n",
+					mcs, cnt, per0, per1, per2, per3, per4);
 				}
 			} else if (format ==  TX_RATE_FORMAT_11N) {
 				sprintf(title_str, "%4s_%3s_MCS%2d	    :",
@@ -555,10 +559,15 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 			  beacon_info->ie_rsn48_len, "RSN48:");
 		dump_data(p, size, &len, beacon_info->ie_mde_ptr,
 			  beacon_info->ie_mde_len, "MDE:");
-		dump_data(p, size, &len, beacon_info->ie_ht_ptr,
-			  beacon_info->ie_ht_len, "HT:");
-		dump_data(p, size, &len, beacon_info->ie_vht_ptr,
-			  beacon_info->ie_vht_len, "VHT:");
+		/* ie_ht_ptr and ie_vht_ptr are write cursors while a beacon
+		 * is parsed, so dump the lists themselves.
+		 */
+		dump_data(p, size, &len, beacon_info->ie_list_ht,
+			  min_t(int, beacon_info->ie_ht_len,
+				sizeof(beacon_info->ie_list_ht)), "HT:");
+		dump_data(p, size, &len, beacon_info->ie_list_vht,
+			  min_t(int, beacon_info->ie_vht_len,
+				sizeof(beacon_info->ie_list_vht)), "VHT:");
 		if (vif->type == NL80211_IFTYPE_MESH_POINT) {
 			dump_data(p, size, &len, beacon_info->ie_meshid_ptr,
 				  beacon_info->ie_meshid_len, "MESHID:");

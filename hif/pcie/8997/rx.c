@@ -372,8 +372,11 @@ int pcie_8997_poll_napi(struct napi_struct *napi, int budget)
 		goto end_poll;
 	}
 
-	while ((curr_hndl->pdesc->rx_control == EAGLE_RXD_CTRL_DMA_OWN) &&
+	while ((READ_ONCE(curr_hndl->pdesc->rx_control) ==
+		EAGLE_RXD_CTRL_DMA_OWN) &&
 	       (work_done < budget)) {
+		/* Read the rest of the descriptor only after rx_control. */
+		dma_rmb();
 		page = curr_hndl->page;
 
 		/* Replace the buffer before handing this one up. If there

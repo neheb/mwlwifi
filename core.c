@@ -417,8 +417,8 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 			wiphy_debug(hw->wiphy, "regdomain: %s\n", prop->name);
 			for (i = 0; i < SYSADPT_MAX_NUM_CHANNELS; i++) {
 				struct mwl_tx_pwr_tbl *pwr_tbl;
-				char disp_buf[64];
-				char *disp_ptr;
+				char disp_buf[SYSADPT_TX_POWER_LEVEL_TOTAL * 5 + 1];
+				int disp_len = 0;
 
 				pwr_tbl = &priv->tx_pwr_tbl[i];
 				if (pwr_tbl->channel == 0)
@@ -429,12 +429,13 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 					    pwr_tbl->setcap,
 					    pwr_tbl->cdd,
 					    pwr_tbl->txantenna2);
-				disp_ptr = disp_buf;
+				disp_buf[0] = '\0';
 				for (j = 0; j < SYSADPT_TX_POWER_LEVEL_TOTAL;
 				     j++) {
-					disp_ptr +=
-						sprintf(disp_ptr, "%x ",
-							pwr_tbl->tx_power[j]);
+					disp_len += scnprintf(disp_buf + disp_len,
+							      sizeof(disp_buf) -
+							      disp_len, "%x ",
+							      pwr_tbl->tx_power[j]);
 				}
 				wiphy_debug(hw->wiphy, "%s\n", disp_buf);
 			}
@@ -446,6 +447,7 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 static void mwl_regd_init(struct mwl_priv *priv)
 {
 	u8 region_code;
+	u8 num_channels;
 	int rc;
 	int i;
 
@@ -456,31 +458,40 @@ static void mwl_regd_init(struct mwl_priv *priv)
 		rc = mwl_fwcmd_get_pwr_tbl_sc4(priv->hw,
 					       &priv->device_pwr_tbl[0],
 					       &region_code,
-					       &priv->number_of_channels,
+					       &num_channels,
 					       0);
 	else
 		rc = mwl_fwcmd_get_device_pwr_tbl(priv->hw,
 						  &priv->device_pwr_tbl[0],
 						  &region_code,
-						  &priv->number_of_channels,
+						  &num_channels,
 						  0);
 	if (rc)
 		return;
 
+	if (num_channels > SYSADPT_MAX_NUM_CHANNELS) {
+		wiphy_warn(priv->hw->wiphy,
+			   "firmware power table has %u channels, using %u\n",
+			   num_channels, SYSADPT_MAX_NUM_CHANNELS);
+		num_channels = SYSADPT_MAX_NUM_CHANNELS;
+	}
+	priv->number_of_channels = num_channels;
+
 	priv->forbidden_setting = true;
 
+	/* Every reply carries the channel count again; ignore it. */
 	for (i = 1; i < priv->number_of_channels; i++) {
 		if (priv->chip_type == MWL8964)
 			mwl_fwcmd_get_pwr_tbl_sc4(priv->hw,
 						  &priv->device_pwr_tbl[i],
 						  &region_code,
-						  &priv->number_of_channels,
+						  &num_channels,
 						  i);
 		else
 			mwl_fwcmd_get_device_pwr_tbl(priv->hw,
 						     &priv->device_pwr_tbl[i],
 						     &region_code,
-						     &priv->number_of_channels,
+						     &num_channels,
 						     i);
 	}
 
@@ -740,7 +751,11 @@ static void mwl_wds_check_handle(struct work_struct *work)
 	struct mwl_sta *sta_info;
 	struct ieee80211_sta *sta;
 	bool wds_sta = false;
+	u8 addr[ETH_ALEN];
 
+	/* The station can be removed as soon as sta_lock is dropped, so
+	 * take what the firmware command needs while holding it.
+	 */
 	spin_lock_bh(&priv->sta_lock);
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
 		if (sta_info->wds)
@@ -748,18 +763,18 @@ static void mwl_wds_check_handle(struct work_struct *work)
 		sta = container_of((void *)sta_info, struct ieee80211_sta,
 				   drv_priv);
 		if (ether_addr_equal(sta->addr, priv->wds_check_sta)) {
+			ether_addr_copy(addr, sta->addr);
+			sta_info->wds = true;
 			wds_sta = true;
 			break;
 		}
 	}
 	spin_unlock_bh(&priv->sta_lock);
 
-	if (wds_sta) {
-		mwl_fwcmd_set_new_stn_wds_sc4(priv->hw, sta->addr);
-		sta_info->wds = true;
-	}
+	if (wds_sta)
+		mwl_fwcmd_set_new_stn_wds_sc4(priv->hw, addr);
 
-	priv->wds_check = false;
+	WRITE_ONCE(priv->wds_check, false);
 }
 
 static void mwl_chnl_switch_event(struct work_struct *work)

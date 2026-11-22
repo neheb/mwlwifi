@@ -242,9 +242,14 @@ static inline u32 pcie_tx_set_skb(struct mwl_priv *priv, struct sk_buff *skb,
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
 	u32 index = desc->tx_vbuflist_idx;
+	u32 i;
 
-	while (desc->tx_vbuflist[index])
+	for (i = 0; desc->tx_vbuflist[index]; i++) {
+		/* Slots of bad TX done entries are never freed. */
+		if (i == MAX_TX_RING_SEND_SIZE)
+			return MAX_TX_RING_SEND_SIZE;
 		index = (index + 1) % MAX_TX_RING_SEND_SIZE;
+	}
 
 	desc->tx_vbuflist_idx = (index + 1) % MAX_TX_RING_SEND_SIZE;
 	desc->pphys_tx_buflist[index] = dma;
@@ -335,9 +340,17 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 		return -EIO;
 	}
 
+	index = pcie_tx_set_skb(priv, tx_skb, dma);
+	if (index == MAX_TX_RING_SEND_SIZE) {
+		dma_unmap_single(&(pcie_priv->pdev)->dev, dma, tx_skb->len,
+				 DMA_TO_DEVICE);
+		ieee80211_free_txskb(priv->hw, tx_skb);
+		wiphy_err(priv->hw->wiphy, "no free TX buffer slot\n");
+		spin_unlock_bh(&pcie_priv->tx_desc_lock);
+		return -ENOSPC;
+	}
 	pnext_tx_desc->data = cpu_to_le32(dma);
 	pnext_tx_desc->ctrl = cpu_to_le32(ctrl);
-	index = pcie_tx_set_skb(priv, tx_skb, dma);
 	desc->tx_buflen[index] = tx_skb->len;
 	pnext_tx_desc->user = cpu_to_le32(index);
 
@@ -501,7 +514,11 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 
 		index = le32_to_cpu(ptx_ring_done->user);
 		ptx_ring_done->user = 0;
-		/* Skip a bad entry rather than stall the ring on it. */
+		/* Skip a bad entry rather than stall the ring on it. The
+		 * firmware has still finished with one descriptor, so count
+		 * it as done; otherwise the busy count only grows and TX
+		 * eventually stops for good.
+		 */
 		if (index >= MAX_TX_RING_SEND_SIZE) {
 			wiphy_err(hw->wiphy,
 				  "corruption for index of buffer\n");
@@ -510,8 +527,9 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 				  "buffer is NULL for tx done ring\n");
 		} else {
 			pcie_tx_return_skb_ndp(hw, index, false);
-			desc->tx_desc_busy_cnt--;
 		}
+		if (desc->tx_desc_busy_cnt)
+			desc->tx_desc_busy_cnt--;
 
 		if (++tx_done_tail >= MAX_TX_RING_DONE_SIZE)
 			tx_done_tail = 0;
@@ -649,7 +667,10 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 			}
 		}
 
-		pcie_tx_encapsulate_frame(priv, skb, k_conf);
+		if (pcie_tx_encapsulate_frame(priv, skb, k_conf)) {
+			ieee80211_free_txskb(hw, skb);
+			return;
+		}
 		if (k_conf &&
 		    (k_conf->cipher == WLAN_CIPHER_SUITE_CCMP ||
 		     k_conf->cipher == WLAN_CIPHER_SUITE_CCMP_256 ||

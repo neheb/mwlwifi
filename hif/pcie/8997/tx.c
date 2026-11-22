@@ -220,7 +220,10 @@ static inline void pcie_tx_skb(struct mwl_priv *priv,
 		case WLAN_CIPHER_SUITE_CCMP:   tailpad = 8; break;
 		}
 	}
-	pcie_tx_add_dma_header(priv, tx_skb, 0, tailpad);
+	if (pcie_tx_add_dma_header(priv, tx_skb, 0, tailpad)) {
+		ieee80211_free_txskb(priv->hw, tx_skb);
+		return;
+	}
 
 	pfu_dma_data = (struct pcie_pfu_dma_data *)tx_skb->data;
 	tx_desc = &pfu_dma_data->tx_desc;

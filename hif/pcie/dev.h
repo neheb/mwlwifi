@@ -725,7 +725,7 @@ struct acnt_bf_mimo_ctrl_s {/* Accounting Record w/ BF MIMO Control Field Data*/
 	__le64 comp_bf_rep;   /* First 8 bytes of Compressed BF Report        */
 } __packed;
 
-static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
+static inline int pcie_tx_add_dma_header(struct mwl_priv *priv,
 					 struct sk_buff *skb,
 					 int head_pad,
 					 int tail_pad)
@@ -757,7 +757,10 @@ static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
 		if (skb_headroom(skb) < needed_room) {
 			wiphy_debug(priv->hw->wiphy, "headroom is short: %d %d",
 				    skb_headroom(skb), needed_room);
-			skb_cow(skb, needed_room);
+			if (skb_cow(skb, needed_room))
+				return -ENOMEM;
+			/* skb_cow() may have moved the data. */
+			wh = (struct ieee80211_hdr *)skb->data;
 		}
 		skb_push(skb, needed_room);
 	}
@@ -783,9 +786,11 @@ static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
 	 */
 	dma_data->fwlen =
 		cpu_to_le16(skb->len - dma_hdrlen + tail_pad);
+
+	return 0;
 }
 
-static inline void pcie_tx_encapsulate_frame(struct mwl_priv *priv,
+static inline int pcie_tx_encapsulate_frame(struct mwl_priv *priv,
 					     struct sk_buff *skb,
 					     struct ieee80211_key_conf *k_conf)
 {
@@ -832,7 +837,7 @@ static inline void pcie_tx_encapsulate_frame(struct mwl_priv *priv,
 		}
 	}
 
-	pcie_tx_add_dma_header(priv, skb, head_pad, data_pad);
+	return pcie_tx_add_dma_header(priv, skb, head_pad, data_pad);
 }
 
 static inline void pcie_tx_prepare_info(struct mwl_priv *priv, u32 rate,

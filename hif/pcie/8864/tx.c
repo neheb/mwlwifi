@@ -280,7 +280,10 @@ static inline void pcie_tx_skb(struct mwl_priv *priv, int desc_num,
 		case WLAN_CIPHER_SUITE_CCMP:   tailpad = 8; break;
 		}
 	}
-	pcie_tx_add_dma_header(priv, tx_skb, 0, tailpad);
+	if (pcie_tx_add_dma_header(priv, tx_skb, 0, tailpad)) {
+		ieee80211_free_txskb(priv->hw, tx_skb);
+		return;
+	}
 
 	tx_hndl = pcie_priv->desc_data[desc_num].pnext_tx_hndl;
 	tx_desc = tx_hndl->pdesc;
@@ -466,6 +469,10 @@ static void pcie_non_pfu_tx_done(struct mwl_priv *priv)
 		       (tx_desc->status & cpu_to_le32(EAGLE_TXD_STATUS_OK)) &&
 		       (!(tx_desc->status &
 		       cpu_to_le32(EAGLE_TXD_STATUS_FW_OWNED)))) {
+			/* Read the rest of the descriptor only after its
+			 * status.
+			 */
+			dma_rmb();
 			dma_unmap_single(&(pcie_priv->pdev)->dev,
 					 le32_to_cpu(tx_desc->pkt_ptr),
 					 le16_to_cpu(tx_desc->pkt_len),

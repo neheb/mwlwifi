@@ -97,7 +97,7 @@ static void mwl_mac80211_tx(struct ieee80211_hw *hw,
 	if (!priv->radio_on) {
 		wiphy_warn(hw->wiphy,
 			   "dropped TX frame since radio is disabled\n");
-		dev_kfree_skb_any(skb);
+		ieee80211_free_txskb(hw, skb);
 		return;
 	}
 
@@ -473,11 +473,13 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 		if (!mwl_vif->set_beacon) {
 			skb = ieee80211_beacon_get(hw, vif, 0);
 
+			/* Retry on the next beacon change if this fails. */
 			if (skb) {
-				mwl_fwcmd_set_beacon(hw, vif, skb->data, skb->len);
+				if (!mwl_fwcmd_set_beacon(hw, vif, skb->data,
+							  skb->len))
+					mwl_vif->set_beacon = true;
 				dev_kfree_skb_any(skb);
 			}
-			mwl_vif->set_beacon = true;
 		}
 	}
 
@@ -602,8 +604,17 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 		}
 	} else {
 		rc = mwl_fwcmd_encryption_remove_key(hw, vif, addr, key);
-		if (vif->type == NL80211_IFTYPE_STATION)
-			mwl_vif->is_hw_crypto_enabled = false;
+		/* A station keeps its pairwise key across GTK rekeys, so
+		 * only the removal of the pairwise key turns crypto off.
+		 */
+		if (key->flags & IEEE80211_KEY_FLAG_PAIRWISE) {
+			if (vif->type == NL80211_IFTYPE_STATION)
+				mwl_vif->is_hw_crypto_enabled = false;
+			if (sta) {
+				sta_info = mwl_dev_get_sta(sta);
+				sta_info->is_key_set = false;
+			}
+		}
 		if (rc)
 			goto out;
 	}
@@ -691,6 +702,19 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 	} else
 		rc = mwl_fwcmd_set_new_stn_add(hw, vif, sta);
 
+	if (rc) {
+		/* mac80211 won't call sta_remove() for a station whose
+		 * sta_add() failed, so undo everything here.
+		 */
+		spin_lock_bh(&priv->sta_lock);
+		list_del(&sta_info->list);
+		spin_unlock_bh(&priv->sta_lock);
+		utils_free_stnid(priv, stnid);
+		if (vif->type == NL80211_IFTYPE_STATION)
+			utils_free_stnid(priv, sta_stnid);
+		return rc;
+	}
+
 	sta_info->link_sta_mode = (vif->type == NL80211_IFTYPE_STATION) &&
 				  !use_4addr;
 	mwl_hif_set_sta_id(hw, sta, sta_info->link_sta_mode, true);
@@ -704,7 +728,7 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 
 	mwl_get_rateinfo(priv, sta->addr, sta_info);
 
-	return rc;
+	return 0;
 }
 
 static int mwl_mac80211_sta_remove(struct ieee80211_hw *hw,
@@ -836,26 +860,26 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 	switch (action) {
 	case IEEE80211_AMPDU_RX_START:
 		if (priv->chip_type == MWL8964) {
-			struct mwl_ampdu_stream tmp;
+			struct mwl_ampdu_stream tmp = {};
 
 			tmp.sta = sta;
 			tmp.tid = tid;
 			spin_unlock_bh(&priv->stream_lock);
-			mwl_fwcmd_create_ba(hw, &tmp, vif,
-					    BA_FLAG_DIRECTION_DOWN,
-					    buf_size, params->ssn,
-					    params->amsdu);
+			rc = mwl_fwcmd_create_ba(hw, &tmp, vif,
+						 BA_FLAG_DIRECTION_DOWN,
+						 buf_size, params->ssn,
+						 params->amsdu);
 			spin_lock_bh(&priv->stream_lock);
 		}
 		break;
 	case IEEE80211_AMPDU_RX_STOP:
 		if (priv->chip_type == MWL8964) {
-			struct mwl_ampdu_stream tmp;
+			struct mwl_ampdu_stream tmp = {};
 
 			tmp.sta = sta;
 			tmp.tid = tid;
 			spin_unlock_bh(&priv->stream_lock);
-			mwl_fwcmd_destroy_ba(hw, &tmp,
+			rc = mwl_fwcmd_destroy_ba(hw, &tmp,
 					     BA_FLAG_DIRECTION_DOWN);
 			spin_lock_bh(&priv->stream_lock);
 		}
