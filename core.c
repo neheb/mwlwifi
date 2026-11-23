@@ -683,7 +683,8 @@ static void mwl_heartbeat_handle(struct work_struct *work)
 static void mwl_watchdog_ba_events(struct work_struct *work)
 {
 	int rc;
-	u8 bitmap = 0, stream_index;
+	u8 bitmap = 0;
+	unsigned int stream_index;
 	struct mwl_ampdu_stream *streams;
 	struct mwl_priv *priv =
 		container_of(work, struct mwl_priv, watchdog_ba_handle);

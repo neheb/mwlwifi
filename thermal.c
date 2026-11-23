@@ -133,7 +133,7 @@ int mwl_thermal_register(struct mwl_priv *priv)
 		wiphy_err(priv->hw->wiphy,
 			  "failed to setup thermal device result: %ld\n",
 			  PTR_ERR(cdev));
-		return -EINVAL;
+		return PTR_ERR(cdev);
 	}
 
 	ret = sysfs_create_link(&priv->dev->kobj, &cdev->device.kobj,
@@ -161,7 +161,7 @@ int mwl_thermal_register(struct mwl_priv *priv)
 		wiphy_err(priv->hw->wiphy,
 			  "failed to register hwmon device: %ld\n",
 			  PTR_ERR(hwmon_dev));
-		ret = -EINVAL;
+		ret = PTR_ERR(hwmon_dev);
 		goto err_remove_link;
 	}
 	priv->hwmon_dev = hwmon_dev;

@@ -312,7 +312,7 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 	len += scnprintf(p + len, size - len,
 			 "region_code: %d\n", le16_to_cpu(get_hw_spec->region_code));
 	len += scnprintf(p + len, size - len,
-			 "num_wcb: %d\n", le32_to_cpu(get_hw_spec->num_wcb));
+			 "num_wcb: %d\n", le16_to_cpu(get_hw_spec->num_wcb));
 
 	if (priv->chip_type == MWL8864) {
 		len += scnprintf(p + len, size - len,
@@ -1002,7 +1002,10 @@ static ssize_t mwl_debugfs_thermal_read(struct file *file,
 	if (!p)
 		return -ENOMEM;
 
-	mwl_fwcmd_get_temp(priv->hw, &priv->temperature);
+	if (mwl_fwcmd_get_temp(priv->hw, &priv->temperature)) {
+		free_page(page);
+		return -EIO;
+	}
 
 	len += scnprintf(p + len, size - len, "quiet period: %d\n",
 			 priv->quiet_period);
@@ -1555,7 +1558,10 @@ static ssize_t mwl_debugfs_core_dump_read(struct file *file, char __user *ubuf,
 	}
 	memcpy(cd, buff, sizeof(*cd));
 
-	if (cd->num_regions > MAX_CORE_REGIONS) {
+	/* The chunk request carries the region index in the top nibble of
+	 * its context word, so only 16 regions can be addressed.
+	 */
+	if (cd->num_regions > min(MAX_CORE_REGIONS, 16)) {
 		wiphy_err(priv->hw->wiphy, "core dump: %d regions\n",
 			  cd->num_regions);
 		ret = -EIO;
@@ -1609,9 +1615,12 @@ static ssize_t mwl_debugfs_core_dump_read(struct file *file, char __user *ubuf,
 			core_dump->size_kb = 0;
 			if (mwl_fwcmd_get_fw_core_dump(priv->hw,
 			    core_dump, buff)) {
-				wiphy_info(priv->hw->wiphy,
-					   "region:%d offset:%x\n", i, offset);
-				break;
+				wiphy_err(priv->hw->wiphy,
+					  "core dump: region:%d offset:%x failed\n",
+					  i, offset);
+				vfree(dump);
+				ret = -EIO;
+				goto err;
 			}
 			chunk = min_t(u32, length - offset,
 				      MAX_CORE_DUMP_BUFFER);
