@@ -151,6 +151,27 @@ static const struct ieee80211_iface_combination ap_if_comb = {
 				BIT(NL80211_CHAN_WIDTH_160),
 };
 
+/* Only the 88W8997 supports mesh: on the others the firmware builds the
+ * header of data frames itself and has no mesh control field, so peering
+ * works but no data passes (seen on the 88W8964). Don't offer it there.
+ */
+static const struct ieee80211_iface_limit ap_if_limits_no_mesh[] = {
+	{ .max = SYSADPT_NUM_OF_AP, .types = BIT(NL80211_IFTYPE_AP) },
+	{ .max = SYSADPT_NUM_OF_CLIENT, .types = BIT(NL80211_IFTYPE_STATION) },
+};
+
+static const struct ieee80211_iface_combination ap_if_comb_no_mesh = {
+	.limits = ap_if_limits_no_mesh,
+	.n_limits = ARRAY_SIZE(ap_if_limits_no_mesh),
+	.max_interfaces = SYSADPT_NUM_OF_AP,
+	.num_different_channels = 1,
+	.radar_detect_widths =	BIT(NL80211_CHAN_WIDTH_20_NOHT) |
+				BIT(NL80211_CHAN_WIDTH_20) |
+				BIT(NL80211_CHAN_WIDTH_40) |
+				BIT(NL80211_CHAN_WIDTH_80) |
+				BIT(NL80211_CHAN_WIDTH_160),
+};
+
 struct region_code_mapping {
 	const char *alpha2;
 	u32 region_code;
@@ -1007,11 +1028,15 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	hw->wiphy->interface_modes = 0;
 	hw->wiphy->interface_modes |= BIT(NL80211_IFTYPE_AP);
-#if defined(CPTCFG_MAC80211_MESH) || defined(CONFIG_MAC80211_MESH)
-	hw->wiphy->interface_modes |= BIT(NL80211_IFTYPE_MESH_POINT);
-#endif
 	hw->wiphy->interface_modes |= BIT(NL80211_IFTYPE_STATION);
-	hw->wiphy->iface_combinations = &ap_if_comb;
+	if (priv->chip_type == MWL8997) {
+#if defined(CPTCFG_MAC80211_MESH) || defined(CONFIG_MAC80211_MESH)
+		hw->wiphy->interface_modes |= BIT(NL80211_IFTYPE_MESH_POINT);
+#endif
+		hw->wiphy->iface_combinations = &ap_if_comb;
+	} else {
+		hw->wiphy->iface_combinations = &ap_if_comb_no_mesh;
+	}
 	hw->wiphy->n_iface_combinations = 1;
 
 	if (priv->antenna_tx == ANTENNA_TX_1) {
