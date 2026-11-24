@@ -1980,6 +1980,9 @@ int mwl_fwcmd_set_beacon(struct ieee80211_hw *hw,
 
 	if (mwl_fwcmd_set_wsc_ie(hw, b_inf->ie_wsc_len, b_inf->ie_wsc_ptr))
 		goto err;
+	mwl_vif->wsc_ie_len = min_t(u8, b_inf->ie_wsc_len,
+				    sizeof(mwl_vif->wsc_ie));
+	memcpy(mwl_vif->wsc_ie, b_inf->ie_wsc_ptr, mwl_vif->wsc_ie_len);
 
 	if (mwl_fwcmd_set_ap_beacon(priv, mwl_vif, &vif->bss_conf))
 		goto err;

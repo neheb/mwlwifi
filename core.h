@@ -416,6 +416,11 @@ struct mwl_vif {
 	struct beacon_info beacon_info;
 	u8 *beacon_data;             /* copy of the template beacon_info points into */
 	bool set_beacon;
+	/* WSC element last given to the firmware, see
+	 * mwl_mac80211_update_wsc_ie()
+	 */
+	u8 wsc_ie[WSC_IE_MAX_LENGTH];
+	u8 wsc_ie_len;
 	int basic_rate_idx;
 	u8 broadcast_ssid;
 };

@@ -403,6 +403,46 @@ static void mwl_mac80211_bss_info_changed_sta(struct ieee80211_hw *hw,
 				  vif->cfg.aid);
 }
 
+/* The beacon is only given to the firmware once (see below), but hostapd
+ * changes the WSC element while it runs, e.g. to announce that the push
+ * button was pressed. Without that, WPS clients don't find the AP. Send
+ * just the WSC element again when it changes.
+ */
+static void mwl_mac80211_update_wsc_ie(struct ieee80211_hw *hw,
+				       struct ieee80211_vif *vif)
+{
+	struct mwl_vif *mwl_vif = mwl_dev_get_vif(vif);
+	struct ieee80211_mgmt *mgmt;
+	const u8 *ie = NULL;
+	struct sk_buff *skb;
+	size_t baselen;
+	u8 len = 0;
+
+	skb = ieee80211_beacon_get(hw, vif, 0);
+	if (!skb)
+		return;
+
+	mgmt = (struct ieee80211_mgmt *)skb->data;
+	baselen = offsetof(struct ieee80211_mgmt, u.beacon.variable);
+	if (skb->len > baselen)
+		ie = cfg80211_find_vendor_ie(WLAN_OUI_MICROSOFT,
+					     WLAN_OUI_TYPE_MICROSOFT_WPS,
+					     mgmt->u.beacon.variable,
+					     skb->len - baselen);
+	if (ie)
+		len = min_t(size_t, ie[1] + 2, sizeof(mwl_vif->wsc_ie));
+
+	if (len != mwl_vif->wsc_ie_len ||
+	    (len && memcmp(ie, mwl_vif->wsc_ie, len))) {
+		if (!mwl_fwcmd_set_wsc_ie(hw, len, (u8 *)ie)) {
+			memcpy(mwl_vif->wsc_ie, ie, len);
+			mwl_vif->wsc_ie_len = len;
+		}
+	}
+
+	dev_kfree_skb_any(skb);
+}
+
 static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 					     struct ieee80211_vif *vif,
 					     struct ieee80211_bss_conf *info,
@@ -487,6 +527,8 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 					mwl_vif->set_beacon = true;
 				dev_kfree_skb_any(skb);
 			}
+		} else {
+			mwl_mac80211_update_wsc_ie(hw, vif);
 		}
 	}
 
