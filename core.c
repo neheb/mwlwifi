@@ -802,8 +802,15 @@ static void mwl_chnl_switch_event(struct work_struct *work)
 		vif = container_of((void *)mwl_vif, struct ieee80211_vif,
 				   drv_priv);
 
-		if (vif->bss_conf.csa_active)
+		if (vif->bss_conf.csa_active) {
+			/* The beacon is only given to the firmware once,
+			 * and its HT/VHT operation elements still describe
+			 * the old channel. Take the one mac80211 sets after
+			 * the switch.
+			 */
+			mwl_vif->set_beacon = false;
 			ieee80211_csa_finish(vif, 0);
+		}
 	}
 	spin_unlock_bh(&priv->vif_lock);
 
