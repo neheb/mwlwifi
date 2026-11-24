@@ -2193,7 +2193,7 @@ int mwl_fwcmd_set_new_stn_add_sc4(struct ieee80211_hw *hw,
 	return 0;
 }
 
-int mwl_fwcmd_set_new_stn_wds_sc4(struct ieee80211_hw *hw, u8 *addr)
+int mwl_fwcmd_set_new_stn_wds_sc4(struct ieee80211_hw *hw, u8 macid, u8 *addr)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_new_stn_sc4 *pcmd;
@@ -2205,6 +2205,7 @@ int mwl_fwcmd_set_new_stn_wds_sc4(struct ieee80211_hw *hw, u8 *addr)
 	memset(pcmd, 0x00, sizeof(*pcmd));
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_NEW_STN);
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->cmd_hdr.macid = macid;
 
 	pcmd->action = cpu_to_le16(HOSTCMD_ACT_STA_ACTION_MODIFY);
 	ether_addr_copy(pcmd->mac_addr, addr);

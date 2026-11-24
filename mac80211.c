@@ -693,12 +693,15 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 		mwl_fwcmd_set_new_stn_del(hw, vif, sta->addr);
 
 	if (priv->chip_type == MWL8964) {
-		if (use_4addr) {
-			sta_info->wds = true;
-			rc = mwl_fwcmd_set_new_stn_add_sc4(hw, vif, sta,
-							   WDS_MODE);
-		} else
-			rc = mwl_fwcmd_set_new_stn_add_sc4(hw, vif, sta, 0);
+		/* The firmware builds the header of every data frame from
+		 * the station entry, so a WDS entry would send EAPOL as
+		 * 4-address frames, which the AP drops before the port is
+		 * authorized. Add the AP as a plain station and switch it
+		 * in sta_state().
+		 */
+		sta_info->wds_on_authorize =
+			vif->type == NL80211_IFTYPE_STATION && use_4addr;
+		rc = mwl_fwcmd_set_new_stn_add_sc4(hw, vif, sta, 0);
 	} else
 		rc = mwl_fwcmd_set_new_stn_add(hw, vif, sta);
 
@@ -716,7 +719,7 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 	}
 
 	sta_info->link_sta_mode = (vif->type == NL80211_IFTYPE_STATION) &&
-				  !use_4addr;
+				  (!use_4addr || sta_info->wds_on_authorize);
 	mwl_hif_set_sta_id(hw, sta, sta_info->link_sta_mode, true);
 
 	for (i = 0; i < NUM_WEP_KEYS; i++) {
@@ -763,6 +766,57 @@ static int mwl_mac80211_sta_remove(struct ieee80211_hw *hw,
 	kfree(ba_stats);
 
 	return rc;
+}
+
+static int mwl_mac80211_sta_authorize_wds(struct ieee80211_hw *hw,
+					  struct ieee80211_vif *vif,
+					  struct ieee80211_sta *sta)
+{
+	struct mwl_vif *mwl_vif = mwl_dev_get_vif(vif);
+	struct mwl_sta *sta_info = mwl_dev_get_sta(sta);
+	int rc;
+
+	rc = mwl_fwcmd_set_new_stn_wds_sc4(hw, mwl_vif->macid, sta->addr);
+	if (rc)
+		return rc;
+
+	/* The firmware now reports the AP's frames under its own station
+	 * ID, as it does for a station that was added in WDS mode.
+	 */
+	mwl_hif_set_sta_id(hw, sta, false, true);
+	mwl_hif_set_sta_id(hw, sta, true, false);
+	sta_info->link_sta_mode = false;
+	WRITE_ONCE(sta_info->wds, true);
+	sta_info->wds_on_authorize = false;
+
+	return 0;
+}
+
+static int mwl_mac80211_sta_state(struct ieee80211_hw *hw,
+				  struct ieee80211_vif *vif,
+				  struct ieee80211_sta *sta,
+				  enum ieee80211_sta_state old_state,
+				  enum ieee80211_sta_state new_state)
+{
+	struct mwl_sta *sta_info = mwl_dev_get_sta(sta);
+
+	/* Add and remove the station where mac80211 would call
+	 * sta_add()/sta_remove(): its capabilities are known by then.
+	 */
+	if (old_state == IEEE80211_STA_AUTH &&
+	    new_state == IEEE80211_STA_ASSOC)
+		return mwl_mac80211_sta_add(hw, vif, sta);
+
+	if (old_state == IEEE80211_STA_ASSOC &&
+	    new_state == IEEE80211_STA_AUTH)
+		return mwl_mac80211_sta_remove(hw, vif, sta);
+
+	if (old_state == IEEE80211_STA_ASSOC &&
+	    new_state == IEEE80211_STA_AUTHORIZED &&
+	    sta_info->wds_on_authorize)
+		return mwl_mac80211_sta_authorize_wds(hw, vif, sta);
+
+	return 0;
 }
 
 static int mwl_mac80211_conf_tx(struct ieee80211_hw *hw,
@@ -1024,8 +1078,7 @@ const struct ieee80211_ops mwl_mac80211_ops = {
 	.configure_filter   = mwl_mac80211_configure_filter,
 	.set_key            = mwl_mac80211_set_key,
 	.set_rts_threshold  = mwl_mac80211_set_rts_threshold,
-	.sta_add            = mwl_mac80211_sta_add,
-	.sta_remove         = mwl_mac80211_sta_remove,
+	.sta_state          = mwl_mac80211_sta_state,
 	.conf_tx            = mwl_mac80211_conf_tx,
 	.get_stats          = mwl_mac80211_get_stats,
 	.get_survey         = mwl_mac80211_get_survey,

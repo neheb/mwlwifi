@@ -476,6 +476,11 @@ struct mwl_sta {
 	u16 stnid;
 	u16 sta_stnid;
 	bool wds;
+	/* A 4-address station's AP: switch the firmware entry to WDS once
+	 * the port is authorized, so that EAPOL goes out as 3-address
+	 * frames like mac80211 sends it.
+	 */
+	bool wds_on_authorize;
 	/* How the station was linked by set_sta_id(), so that removing it
 	 * clears the same slot.
 	 */

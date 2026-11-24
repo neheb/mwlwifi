@@ -753,6 +753,7 @@ static void mwl_wds_check_handle(struct work_struct *work)
 	struct ieee80211_sta *sta;
 	bool wds_sta = false;
 	u8 addr[ETH_ALEN];
+	u8 macid = 0;
 
 	/* The station can be removed as soon as sta_lock is dropped, so
 	 * take what the firmware command needs while holding it.
@@ -765,6 +766,7 @@ static void mwl_wds_check_handle(struct work_struct *work)
 				   drv_priv);
 		if (ether_addr_equal(sta->addr, priv->wds_check_sta)) {
 			ether_addr_copy(addr, sta->addr);
+			macid = sta_info->mwl_vif->macid;
 			sta_info->wds = true;
 			wds_sta = true;
 			break;
@@ -773,7 +775,7 @@ static void mwl_wds_check_handle(struct work_struct *work)
 	spin_unlock_bh(&priv->sta_lock);
 
 	if (wds_sta)
-		mwl_fwcmd_set_new_stn_wds_sc4(priv->hw, addr);
+		mwl_fwcmd_set_new_stn_wds_sc4(priv->hw, macid, addr);
 
 	WRITE_ONCE(priv->wds_check, false);
 }
