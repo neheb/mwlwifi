@@ -538,6 +538,9 @@ struct hostcmd_cmd_set_fixed_rate {
 	u8 management_rate;
 } __packed;
 
+/* Size of the firmware's SET_IES proprietary element buffer */
+#define MWL_IE_LIST_PROPRIETARY_LEN 112
+
 /* HOSTCMD_CMD_SET_IES */
 struct hostcmd_cmd_set_ies {
 	struct hostcmd_header cmd_hdr;

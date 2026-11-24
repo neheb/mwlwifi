@@ -882,6 +882,7 @@ int mwl_fwcmd_get_hw_specs(struct ieee80211_hw *hw,
 	 * command once the mutex is released.
 	 */
 	memcpy(spec, &pcmd->hw_spec, sizeof(*spec));
+	memcpy(&priv->hw_spec, &pcmd->hw_spec, sizeof(priv->hw_spec));
 	mutex_unlock(&priv->fwcmd_mutex);
 
 	return 0;

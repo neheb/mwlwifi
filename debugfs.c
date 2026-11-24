@@ -293,18 +293,15 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
 	ssize_t ret;
-	struct hostcmd_get_hw_spec hw_spec;
-	const struct hostcmd_get_hw_spec *get_hw_spec = &hw_spec;
+	/* Asking the firmware again stops the 88W8964 beaconing, so print
+	 * what it reported at probe time.
+	 */
+	const struct hostcmd_get_hw_spec *get_hw_spec = &priv->hw_spec;
 	int i;
 
 	if (!p)
 		return -ENOMEM;
 
-	/* get and prepare HW specifications */
-	if (mwl_fwcmd_get_hw_specs(priv->hw, &hw_spec)) {
-		wiphy_err(priv->hw->wiphy, "fail to get HW specifications\n");
-		goto err_get_hw_specs;
-	}
 	len += scnprintf(p + len, size - len,
 			 "host_if: %d\n", get_hw_spec->host_if);
 	len += scnprintf(p + len, size - len,
@@ -338,7 +335,6 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 			 "permanent mac address: %pM\n", get_hw_spec->permanent_addr);
 	len += scnprintf(p + len, size - len,
 			 "fw_awake_cookie: %d\n", le32_to_cpu(get_hw_spec->fw_awake_cookie));
-err_get_hw_specs:
 	len += scnprintf(p + len, size - len,
 			 "driver name: %s\n",
 			 mwl_hif_get_driver_name(priv->hw));

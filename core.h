@@ -24,6 +24,7 @@
 #include <net/mac80211.h>
 
 #include "hif/hif.h"
+#include "hif/hostcmd.h"
 
 /* antenna control */
 #define ANTENNA_TX_4_AUTO             0
@@ -263,6 +264,10 @@ struct mwl_priv {
 
 	int irq;
 	struct mwl_hw_data hw_data;  /* Adapter HW specific info     */
+	/* GET_HW_SPEC result from probe. The 88W8964 firmware stops
+	 * beaconing if the command is sent again while it is running.
+	 */
+	struct hostcmd_get_hw_spec hw_spec;
 
 	struct timer_list period_timer;
 
@@ -355,9 +360,6 @@ struct mwl_priv {
 };
 
 #define MWL_CMD_BUF_SIZE 0x4000
-
-/* Size of the firmware's SET_IES proprietary element buffer */
-#define MWL_IE_LIST_PROPRIETARY_LEN 112
 
 struct beacon_info {
 	bool valid;
