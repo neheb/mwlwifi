@@ -1069,6 +1069,7 @@ static void mwl_wl_deinit(struct mwl_priv *priv)
 	}
 
 	ieee80211_unregister_hw(hw);
+	priv->rmmod = true;
 	kfree(hw->wiphy->addresses);
 	hw->wiphy->addresses = NULL;
 	mwl_thermal_unregister(priv);

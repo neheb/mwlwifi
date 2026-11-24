@@ -1744,9 +1744,15 @@ static void pcie_remove(struct pci_dev *pdev)
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
 	struct mwl_priv *priv = hw->priv;
 
-	priv->rmmod = true;
-	while (priv->in_send_cmd)
-		usleep_range(1000, 2000);
+	/* mac80211 still removes keys and stations while it unregisters,
+	 * so only cut commands short now if the firmware has stopped
+	 * answering; mwl_wl_deinit() does it once mac80211 is done.
+	 */
+	if (priv->cmd_timeout) {
+		priv->rmmod = true;
+		while (priv->in_send_cmd)
+			usleep_range(1000, 2000);
+	}
 	mwl_deinit_hw(hw);
 	pci_set_drvdata(pdev, NULL);
 	mwl_free_hw(hw);
