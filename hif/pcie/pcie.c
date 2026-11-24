@@ -1226,9 +1226,14 @@ static void pcie_rx_account(struct mwl_priv *priv,
 			return;
 		break;
 	case RX_RATE_INFO_FORMAT_11B:
-		rate_mcs = utils_get_rate_id(rate & 0xF);
+		/* The rate is the PLCP signal value in units of 100 kb/s
+		 * (10, 20, 55, 110), not an OFDM rate code, so it must not
+		 * be masked. 1 and 2 Mb/s are left out like the basic OFDM
+		 * rates above.
+		 */
+		rate_mcs = utils_get_rate_id(rate);
 		gi = RX_RATE_INFO_LONG_INTERVAL;
-		if ((rate_mcs == 0) || (rate_mcs == 1))
+		if ((rate_mcs != 2) && (rate_mcs != 3))
 			return;
 		break;
 	case RX_RATE_INFO_FORMAT_11N:
