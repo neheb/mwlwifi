@@ -293,6 +293,20 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 
 	tx_info = IEEE80211_SKB_CB(tx_skb);
 	tx_ctrl = (struct pcie_tx_ctrl_ndp *)tx_info->driver_data;
+
+	/* The firmware reports completions 64 at a time, and not at all
+	 * while fewer than 64 are outstanding, so a sending socket would
+	 * wait on frames that are long gone and a UDP sender with the
+	 * default buffer stalls. Release the socket's memory now, unless
+	 * the TX status is wanted (mac80211 also sets REQ_TX_STATUS for a
+	 * socket that asked for wifi status). TCP is left alone: TSQ
+	 * allows far more than the firmware holds back, and without it a
+	 * local sender fills the driver's queue and adds latency.
+	 */
+	if (tx_skb->sk && !sk_is_tcp(tx_skb->sk) &&
+	    !(tx_info->flags & IEEE80211_TX_CTL_REQ_TX_STATUS))
+		skb_orphan(tx_skb);
+
 	pnext_tx_desc = &desc->ptx_ring[tx_send_head_new];
 	memset(pnext_tx_desc, 0, sizeof(*pnext_tx_desc));
 
