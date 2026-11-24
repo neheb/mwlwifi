@@ -112,10 +112,14 @@ static const u32 cipher_suites[] = {
 	WLAN_CIPHER_SUITE_AES_CMAC,
 };
 
+/* No TKIP: the 88W8964 firmware (9.3.2.12) sends TKIP data frames that
+ * no client can decrypt (Michael MIC failures on every group frame),
+ * and it builds and encrypts data frames itself, so mac80211 can't do
+ * TKIP in software either.
+ */
 static const u32 cipher_suites_8964[] = {
 	WLAN_CIPHER_SUITE_WEP40,
 	WLAN_CIPHER_SUITE_WEP104,
-	WLAN_CIPHER_SUITE_TKIP,
 	WLAN_CIPHER_SUITE_CCMP,
 	WLAN_CIPHER_SUITE_CCMP_256,
 	WLAN_CIPHER_SUITE_GCMP,

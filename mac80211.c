@@ -580,8 +580,9 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 					IEEE80211_KEY_FLAG_GENERATE_IV_MGMT;
 			break;
 		case WLAN_CIPHER_SUITE_TKIP:
-			if (priv->chip_type != MWL8964)
-				key->flags |= IEEE80211_KEY_FLAG_GENERATE_MMIC | IEEE80211_KEY_FLAG_GENERATE_IV;
+			/* The 88W8964 doesn't advertise TKIP. */
+			key->flags |= IEEE80211_KEY_FLAG_GENERATE_MMIC |
+				      IEEE80211_KEY_FLAG_GENERATE_IV;
 			encr_type = ENCR_TYPE_TKIP;
 			break;
 		default:
