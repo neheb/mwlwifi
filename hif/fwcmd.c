@@ -237,8 +237,9 @@ static u8 mwl_fwcmd_get_pri_chnl_idx(const struct cfg80211_chan_def *chandef)
  * HOSTCMD_CMD_AP_BEACON give it, rather than transmitting the template that
  * mac80211 hands us. HT/VHT elements, RSN/WPA, rates, country and so on each
  * go into dedicated fields of those commands, so they have to be picked out
- * of the template here. The firmware generates SSID, DS parameters, TIM, ERP
- * and the channel switch related elements on its own.
+ * of the template here. The firmware generates SSID, DS parameters, TIM and
+ * ERP on its own. It does not announce a channel switch (88W8964 firmware
+ * 9.3.2.12), so the channel switch elements are passed on like the rest.
  *
  * Anything else (elements added by newer hostapd features, vendor elements
  * and so on) goes into the proprietary element list, which the firmware
@@ -253,13 +254,9 @@ static bool mwl_fwcmd_ie_is_fw_generated(u8 id)
 	case WLAN_EID_TIM:
 	case WLAN_EID_IBSS_PARAMS:
 	case WLAN_EID_TPC_REPORT:
-	case WLAN_EID_CHANNEL_SWITCH:
 	case WLAN_EID_QUIET:
 	case WLAN_EID_ERP_INFO:
-	case WLAN_EID_EXT_CHANSWITCH_ANN:
 	case WLAN_EID_SECONDARY_CHANNEL_OFFSET:
-	case WLAN_EID_WIDE_BW_CHANNEL_SWITCH:
-	case WLAN_EID_CHANNEL_SWITCH_WRAPPER:
 		return true;
 	default:
 		return false;

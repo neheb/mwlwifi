@@ -470,6 +470,13 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 			}
 		}
 
+		/* The firmware doesn't announce a channel switch itself, so
+		 * give it the beacon with mac80211's channel switch element,
+		 * or clients don't follow the AP.
+		 */
+		if (vif->bss_conf.csa_active)
+			mwl_vif->set_beacon = false;
+
 		if (!mwl_vif->set_beacon) {
 			skb = ieee80211_beacon_get(hw, vif, 0);
 
