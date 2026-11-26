@@ -1657,7 +1657,7 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		printed_version = true;
 	}
 
-	rc = pci_enable_device(pdev);
+	rc = pcim_enable_device(pdev);
 	if (rc) {
 		pr_err("%s: cannot enable new PCI device\n",
 		       PCIE_DRV_NAME);
@@ -1668,7 +1668,7 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (rc) {
 		pr_err("%s: 32-bit PCI DMA not supported\n",
 		       PCIE_DRV_NAME);
-		goto err_pci_disable_device;
+		return rc;
 	}
 
 	pci_set_master(pdev);
@@ -1685,8 +1685,7 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (!hw) {
 		pr_err("%s: mwlwifi hw alloc failed\n",
 		       PCIE_DRV_NAME);
-		rc = -ENOMEM;
-		goto err_pci_disable_device;
+		return -ENOMEM;
 	}
 
 	pci_set_drvdata(pdev, hw);
@@ -1731,10 +1730,6 @@ err_alloc_pci_resource:
 	pci_set_drvdata(pdev, NULL);
 	mwl_free_hw(hw);
 
-err_pci_disable_device:
-
-	pci_disable_device(pdev);
-
 	return rc;
 }
 
@@ -1755,7 +1750,6 @@ static void pcie_remove(struct pci_dev *pdev)
 	mwl_deinit_hw(hw);
 	pci_set_drvdata(pdev, NULL);
 	mwl_free_hw(hw);
-	pci_disable_device(pdev);
 }
 
 static struct pci_driver mwl_pcie_driver = {
