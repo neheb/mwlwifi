@@ -715,7 +715,7 @@ static void mwl_watchdog_ba_events(struct work_struct *work)
 	if (rc)
 		return;
 
-	spin_lock_bh(&priv->stream_lock);
+	guard(spinlock_bh)(&priv->stream_lock);
 
 	/* the bitmap is the hw queue number.  Map it to the ampdu queue. */
 	if (bitmap != INVALID_WATCHDOG) {
@@ -728,7 +728,6 @@ static void mwl_watchdog_ba_events(struct work_struct *work)
 
 		if (bitmap != 0xFF) {
 			if (stream_index >= priv->ampdu_num) {
-				spin_unlock_bh(&priv->stream_lock);
 				wiphy_warn(priv->hw->wiphy,
 					   "BA watchdog: bad queue %u\n", bitmap);
 				return;
@@ -754,8 +753,6 @@ static void mwl_watchdog_ba_events(struct work_struct *work)
 			}
 		}
 	}
-
-	spin_unlock_bh(&priv->stream_lock);
 }
 
 static void mwl_account_handle(struct work_struct *work)
@@ -779,21 +776,21 @@ static void mwl_wds_check_handle(struct work_struct *work)
 	/* The station can be removed as soon as sta_lock is dropped, so
 	 * take what the firmware command needs while holding it.
 	 */
-	spin_lock_bh(&priv->sta_lock);
-	list_for_each_entry(sta_info, &priv->sta_list, list) {
-		if (sta_info->wds)
-			continue;
-		sta = container_of((void *)sta_info, struct ieee80211_sta,
-				   drv_priv);
-		if (ether_addr_equal(sta->addr, priv->wds_check_sta)) {
-			ether_addr_copy(addr, sta->addr);
-			macid = sta_info->mwl_vif->macid;
-			sta_info->wds = true;
-			wds_sta = true;
-			break;
+	scoped_guard(spinlock_bh, &priv->sta_lock) {
+		list_for_each_entry(sta_info, &priv->sta_list, list) {
+			if (sta_info->wds)
+				continue;
+			sta = container_of((void *)sta_info, struct ieee80211_sta,
+					   drv_priv);
+			if (ether_addr_equal(sta->addr, priv->wds_check_sta)) {
+				ether_addr_copy(addr, sta->addr);
+				macid = sta_info->mwl_vif->macid;
+				sta_info->wds = true;
+				wds_sta = true;
+				break;
+			}
 		}
 	}
-	spin_unlock_bh(&priv->sta_lock);
 
 	if (wds_sta)
 		mwl_fwcmd_set_new_stn_wds_sc4(priv->hw, macid, addr);
@@ -814,22 +811,22 @@ static void mwl_chnl_switch_event(struct work_struct *work)
 		return;
 	}
 
-	spin_lock_bh(&priv->vif_lock);
-	list_for_each_entry(mwl_vif, &priv->vif_list, list) {
-		vif = container_of((void *)mwl_vif, struct ieee80211_vif,
-				   drv_priv);
+	scoped_guard(spinlock_bh, &priv->vif_lock) {
+		list_for_each_entry(mwl_vif, &priv->vif_list, list) {
+			vif = container_of((void *)mwl_vif, struct ieee80211_vif,
+					   drv_priv);
 
-		if (vif->bss_conf.csa_active) {
-			/* The beacon is only given to the firmware once,
-			 * and its HT/VHT operation elements still describe
-			 * the old channel. Take the one mac80211 sets after
-			 * the switch.
-			 */
-			mwl_vif->set_beacon = false;
-			ieee80211_csa_finish(vif, 0);
+			if (vif->bss_conf.csa_active) {
+				/* The beacon is only given to the firmware once,
+				 * and its HT/VHT operation elements still describe
+				 * the old channel. Take the one mac80211 sets after
+				 * the switch.
+				 */
+				mwl_vif->set_beacon = false;
+				ieee80211_csa_finish(vif, 0);
+			}
 		}
 	}
-	spin_unlock_bh(&priv->vif_lock);
 
 	wiphy_info(priv->hw->wiphy, "channel switch is done\n");
 

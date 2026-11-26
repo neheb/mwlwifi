@@ -254,15 +254,11 @@ struct mwl_vif *utils_find_vif_bss(struct mwl_priv *priv, u8 *bssid)
 {
 	struct mwl_vif *mwl_vif;
 
-	spin_lock_bh(&priv->vif_lock);
+	guard(spinlock_bh)(&priv->vif_lock);
 	list_for_each_entry(mwl_vif, &priv->vif_list, list) {
-		if (ether_addr_equal(bssid, mwl_vif->bssid)) {
-			spin_unlock_bh(&priv->vif_lock);
+		if (ether_addr_equal(bssid, mwl_vif->bssid))
 			return mwl_vif;
-		}
 	}
-	spin_unlock_bh(&priv->vif_lock);
-
 	return NULL;
 }
 
@@ -271,17 +267,13 @@ struct mwl_sta *utils_find_sta(struct mwl_priv *priv, u8 *addr)
 	struct mwl_sta *sta_info;
 	struct ieee80211_sta *sta;
 
-	spin_lock_bh(&priv->sta_lock);
+	guard(spinlock_bh)(&priv->sta_lock);
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
 		sta = container_of((void *)sta_info, struct ieee80211_sta,
 				   drv_priv);
-		if (ether_addr_equal(addr, sta->addr)) {
-			spin_unlock_bh(&priv->sta_lock);
+		if (ether_addr_equal(addr, sta->addr))
 			return sta_info;
-		}
 	}
-	spin_unlock_bh(&priv->sta_lock);
-
 	return NULL;
 }
 
@@ -290,17 +282,13 @@ struct mwl_sta *utils_find_sta_by_aid(struct mwl_priv *priv, u16 aid)
 	struct mwl_sta *sta_info;
 	struct ieee80211_sta *sta;
 
-	spin_lock_bh(&priv->sta_lock);
+	guard(spinlock_bh)(&priv->sta_lock);
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
 		sta = container_of((void *)sta_info, struct ieee80211_sta,
 				   drv_priv);
-		if (sta->aid == aid) {
-			spin_unlock_bh(&priv->sta_lock);
+		if (sta->aid == aid)
 			return sta_info;
-		}
 	}
-	spin_unlock_bh(&priv->sta_lock);
-
 	return NULL;
 }
 
@@ -308,15 +296,11 @@ struct mwl_sta *utils_find_sta_by_id(struct mwl_priv *priv, u16 stnid)
 {
 	struct mwl_sta *sta_info;
 
-	spin_lock_bh(&priv->sta_lock);
+	guard(spinlock_bh)(&priv->sta_lock);
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
-		if (sta_info->stnid == stnid) {
-			spin_unlock_bh(&priv->sta_lock);
+		if (sta_info->stnid == stnid)
 			return sta_info;
-		}
 	}
-	spin_unlock_bh(&priv->sta_lock);
-
 	return NULL;
 }
 

@@ -249,9 +249,8 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 	}
 
 	priv->macids_used |= 1 << mwl_vif->macid;
-	spin_lock_bh(&priv->vif_lock);
+	guard(spinlock_bh)(&priv->vif_lock);
 	list_add_tail(&mwl_vif->list, &priv->vif_list);
-	spin_unlock_bh(&priv->vif_lock);
 
 	return 0;
 }
@@ -270,15 +269,15 @@ static void mwl_mac80211_remove_vif(struct mwl_priv *priv,
 		struct ieee80211_vif *_vif;
 		struct mwl_vif *iter;
 
-		spin_lock_bh(&priv->vif_lock);
-		list_for_each_entry(iter, &priv->vif_list, list) {
-			_vif = container_of((void *)iter, struct ieee80211_vif,
-					drv_priv);
+		scoped_guard(spinlock_bh, &priv->vif_lock) {
+			list_for_each_entry(iter, &priv->vif_list, list) {
+				_vif = container_of((void *)iter, struct ieee80211_vif,
+						drv_priv);
 
-			if (_vif->type == NL80211_IFTYPE_MONITOR)
-				counter++;
+				if (_vif->type == NL80211_IFTYPE_MONITOR)
+					counter++;
+			}
 		}
-		spin_unlock_bh(&priv->vif_lock);
 		/* but if existe more than 1,
 		   so 1 interface is still activ*/
 		if (counter <= 1)
@@ -288,9 +287,8 @@ static void mwl_mac80211_remove_vif(struct mwl_priv *priv,
 	mwl_hif_tx_del_pkts_via_vif(priv->hw, vif);
 
 	priv->macids_used &= ~(1 << mwl_vif->macid);
-	spin_lock_bh(&priv->vif_lock);
-	list_del(&mwl_vif->list);
-	spin_unlock_bh(&priv->vif_lock);
+	scoped_guard(spinlock_bh, &priv->vif_lock)
+		list_del(&mwl_vif->list);
 
 	kfree(mwl_vif->beacon_data);
 	mwl_vif->beacon_data = NULL;
@@ -735,9 +733,8 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 		sta_info->sta_stnid = sta_stnid;
 	sta_info->tx_rate_info = utils_get_init_tx_rate(priv, &hw->conf, sta);
 	spin_lock_init(&sta_info->amsdu_lock);
-	spin_lock_bh(&priv->sta_lock);
-	list_add_tail(&sta_info->list, &priv->sta_list);
-	spin_unlock_bh(&priv->sta_lock);
+	scoped_guard(spinlock_bh, &priv->sta_lock)
+		list_add_tail(&sta_info->list, &priv->sta_list);
 
 	if (vif->type == NL80211_IFTYPE_STATION)
 		mwl_fwcmd_set_new_stn_del(hw, vif, sta->addr);
@@ -759,9 +756,8 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 		/* mac80211 won't call sta_remove() for a station whose
 		 * sta_add() failed, so undo everything here.
 		 */
-		spin_lock_bh(&priv->sta_lock);
-		list_del(&sta_info->list);
-		spin_unlock_bh(&priv->sta_lock);
+		scoped_guard(spinlock_bh, &priv->sta_lock)
+			list_del(&sta_info->list);
 		utils_free_stnid(priv, stnid);
 		if (vif->type == NL80211_IFTYPE_STATION)
 			utils_free_stnid(priv, sta_stnid);
@@ -806,12 +802,12 @@ static int mwl_mac80211_sta_remove(struct ieee80211_hw *hw,
 	if (vif->type == NL80211_IFTYPE_STATION)
 		utils_free_stnid(priv, sta_info->sta_stnid);
 
-	spin_lock_bh(&priv->sta_lock);
-	list_del(&sta_info->list);
-	sta_info->ba_hist.enable = false;
-	ba_stats = sta_info->ba_hist.ba_stats;
-	sta_info->ba_hist.ba_stats = NULL;
-	spin_unlock_bh(&priv->sta_lock);
+	scoped_guard(spinlock_bh, &priv->sta_lock) {
+		list_del(&sta_info->list);
+		sta_info->ba_hist.enable = false;
+		ba_stats = sta_info->ba_hist.ba_stats;
+		sta_info->ba_hist.ba_stats = NULL;
+	}
 
 	kfree(ba_stats);
 

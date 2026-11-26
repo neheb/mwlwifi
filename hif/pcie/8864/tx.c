@@ -351,7 +351,7 @@ struct sk_buff *pcie_tx_do_amsdu(struct mwl_priv *priv,
 			return tx_skb;
 	}
 
-	spin_lock_bh(&sta_info->amsdu_lock);
+	guard(spinlock_bh)(&sta_info->amsdu_lock);
 	amsdu = &sta_info->amsdu_ctrl.frag[desc_num];
 
 	if (amsdu->num) {
@@ -367,7 +367,6 @@ struct sk_buff *pcie_tx_do_amsdu(struct mwl_priv *priv,
 		amsdu->skb = dev_alloc_skb(sta_info->amsdu_ctrl.amsdu_allow_size +
 				       pcie_priv->tx_head_room);
 		if (!amsdu->skb) {
-			spin_unlock_bh(&sta_info->amsdu_lock);
 			return tx_skb;
 		}
 
@@ -412,11 +411,9 @@ struct sk_buff *pcie_tx_do_amsdu(struct mwl_priv *priv,
 	}
 	if (amsdu->num > SYSADPT_AMSDU_FRAGMENT_THRESHOLD) {
 		amsdu->num = 0;
-		spin_unlock_bh(&sta_info->amsdu_lock);
 		return amsdu->skb;
 	}
 
-	spin_unlock_bh(&sta_info->amsdu_lock);
 	return NULL;
 }
 
@@ -433,7 +430,7 @@ static void pcie_non_pfu_tx_done(struct mwl_priv *priv)
 	struct pcie_dma_data *dma_data;
 	struct ieee80211_tx_info *info;
 
-	spin_lock_bh(&pcie_priv->tx_desc_lock);
+	guard(spinlock_bh)(&pcie_priv->tx_desc_lock);
 	while (num--) {
 		if (!pcie_priv->fw_desc_cnt[num])
 			continue;
@@ -488,7 +485,6 @@ static void pcie_non_pfu_tx_done(struct mwl_priv *priv)
 
 		desc->pstale_tx_hndl = tx_hndl;
 	}
-	spin_unlock_bh(&pcie_priv->tx_desc_lock);
 }
 
 int pcie_8864_tx_init(struct ieee80211_hw *hw)
@@ -539,7 +535,7 @@ void pcie_8864_tx_skbs(struct work_struct *work)
 	struct mwl_amsdu_frag *amsdu_frag;
 	struct mwl_sta *sta_info;
 
-	spin_lock_bh(&pcie_priv->tx_desc_lock);
+	guard(spinlock_bh)(&pcie_priv->tx_desc_lock);
 	while (num--) {
 		while (true) {
 			struct ieee80211_tx_info *tx_info;
@@ -575,17 +571,17 @@ void pcie_8864_tx_skbs(struct work_struct *work)
 
 		spin_lock_bh(&priv->sta_lock);
 		list_for_each_entry(sta_info, &priv->sta_list, list) {
-			spin_lock_bh(&sta_info->amsdu_lock);
-			amsdu_frag = &sta_info->amsdu_ctrl.frag[num];
-			if (amsdu_frag->num) {
-				if (pcie_tx_available(priv, num))
-					pcie_tx_skb(priv, num, amsdu_frag->skb);
-				else
-					skb_queue_head(&pcie_priv->txq[num],
-						       amsdu_frag->skb);
-				amsdu_frag->num = 0;
+			scoped_guard(spinlock_bh, &sta_info->amsdu_lock) {
+				amsdu_frag = &sta_info->amsdu_ctrl.frag[num];
+				if (amsdu_frag->num) {
+					if (pcie_tx_available(priv, num))
+						pcie_tx_skb(priv, num, amsdu_frag->skb);
+					else
+						skb_queue_head(&pcie_priv->txq[num],
+							       amsdu_frag->skb);
+					amsdu_frag->num = 0;
+				}
 			}
-			spin_unlock_bh(&sta_info->amsdu_lock);
 		}
 		spin_unlock_bh(&priv->sta_lock);
 
@@ -598,7 +594,6 @@ void pcie_8864_tx_skbs(struct work_struct *work)
 				ieee80211_wake_queue(hw, queue);
 		}
 	}
-	spin_unlock_bh(&pcie_priv->tx_desc_lock);
 }
 
 void pcie_8864_tx_done_task(struct work_struct *work)
@@ -815,18 +810,18 @@ void pcie_8864_tx_xmit(struct ieee80211_hw *hw,
 
 	/* Initiate the ampdu session here */
 	if (start_ba_session) {
-		spin_lock_bh(&priv->stream_lock);
+		scoped_guard(spinlock_bh, &priv->stream_lock) {
 
-		rc = mwl_fwcmd_start_stream(hw, stream);
-		if (rc)
-			mwl_fwcmd_remove_stream(hw, stream);
-		else if (priv->debug_ampdu)
-			wiphy_debug(hw->wiphy, "Mac80211 start BA %pM\n",
-				    stream->sta->addr);
-		stream->jiffies = jiffies;
-		stream->start_time = stream->jiffies;
-		stream->desc_num = index;
-		spin_unlock_bh(&priv->stream_lock);
+			rc = mwl_fwcmd_start_stream(hw, stream);
+			if (rc)
+				mwl_fwcmd_remove_stream(hw, stream);
+			else if (priv->debug_ampdu)
+				wiphy_debug(hw->wiphy, "Mac80211 start BA %pM\n",
+					    stream->sta->addr);
+			stream->jiffies = jiffies;
+			stream->start_time = stream->jiffies;
+			stream->desc_num = index;
+		}
 	}
 }
 
@@ -920,7 +915,7 @@ void pcie_8864_tx_del_sta_amsdu_pkts(struct ieee80211_hw *hw,
 	int num;
 	struct mwl_amsdu_frag *amsdu_frag;
 
-	spin_lock_bh(&sta_info->amsdu_lock);
+	guard(spinlock_bh)(&sta_info->amsdu_lock);
 	for (num = 0; num < SYSADPT_TX_WMM_QUEUES; num++) {
 		amsdu_frag = &sta_info->amsdu_ctrl.frag[num];
 		if (amsdu_frag->num) {
@@ -929,5 +924,4 @@ void pcie_8864_tx_del_sta_amsdu_pkts(struct ieee80211_hw *hw,
 				ieee80211_free_txskb(hw, amsdu_frag->skb);
 		}
 	}
-	spin_unlock_bh(&sta_info->amsdu_lock);
 }

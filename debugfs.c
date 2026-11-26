@@ -381,7 +381,7 @@ static int mwl_debugfs_vif_show(struct seq_file *s, void *data)
 	struct cfg80211_chan_def *chan_def;
 	struct beacon_info *beacon_info;
 
-	spin_lock_bh(&priv->vif_lock);
+	guard(spinlock_bh)(&priv->vif_lock);
 	list_for_each_entry(mwl_vif, &priv->vif_list, list) {
 		vif = container_of((void *)mwl_vif, struct ieee80211_vif,
 				   drv_priv);
@@ -448,7 +448,6 @@ static int mwl_debugfs_vif_show(struct seq_file *s, void *data)
 				  beacon_info->ie_meshchsw_len, "MESHCHSW:");
 		}
 	}
-	spin_unlock_bh(&priv->vif_lock);
 
 
 	return 0;
@@ -462,7 +461,7 @@ static int mwl_debugfs_sta_show(struct seq_file *s, void *data)
 
 	seq_puts(s, "       macaddress|aid|ampdu|amsdu|  wds|ba_hist|amsdu_cap|  ht cap, ampdu,         rx_mask|   vht_cap|           mcs|rx bw,nss|tdls|init|wme|mfp\n");
 
-	spin_lock_bh(&priv->sta_lock);
+	guard(spinlock_bh)(&priv->sta_lock);
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
 		sta = container_of((void *)sta_info, struct ieee80211_sta,
 				   drv_priv);
@@ -493,7 +492,6 @@ static int mwl_debugfs_sta_show(struct seq_file *s, void *data)
 			   sta->mfp
 			   );
 	}
-	spin_unlock_bh(&priv->sta_lock);
 
 
 	return 0;
@@ -537,7 +535,7 @@ static int mwl_debugfs_ampdu_show(struct seq_file *s, void *data)
 		}
 	}
 	spin_unlock_bh(&priv->stream_lock);
-	spin_lock_bh(&priv->sta_lock);
+	guard(spinlock_bh)(&priv->sta_lock);
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
 		for (i = 0; i < MWL_MAX_TID; i++) {
 			if (sta_info->check_ba_failed[i]) {
@@ -550,7 +548,6 @@ static int mwl_debugfs_ampdu_show(struct seq_file *s, void *data)
 			}
 		}
 	}
-	spin_unlock_bh(&priv->sta_lock);
 
 
 	return 0;
@@ -579,7 +576,7 @@ static int mwl_debugfs_stnid_show(struct seq_file *s, void *data)
 	struct mwl_stnid *stnid;
 	int i;
 
-	spin_lock_bh(&priv->stnid_lock);
+	guard(spinlock_bh)(&priv->stnid_lock);
 	for (i = 0; i < priv->stnid_num; i++) {
 		stnid = &priv->stnid[i];
 		if (!stnid->aid)
@@ -587,7 +584,6 @@ static int mwl_debugfs_stnid_show(struct seq_file *s, void *data)
 		seq_printf(s, "stnid: %d macid: %d aid: %d\n",
 			   i + 1, stnid->macid, stnid->aid);
 	}
-	spin_unlock_bh(&priv->stnid_lock);
 
 
 	return 0;
@@ -896,7 +892,7 @@ static int mwl_debugfs_tx_hist_show(struct seq_file *s, void *data)
 		   priv->ra_tx_attempt[MU_MIMO][3],
 		   priv->ra_tx_attempt[MU_MIMO][4],
 		   priv->ra_tx_attempt[MU_MIMO][5]);
-	spin_lock_bh(&priv->sta_lock);
+	guard(spinlock_bh)(&priv->sta_lock);
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
 		sta = container_of((void *)sta_info, struct ieee80211_sta,
 				   drv_priv);
@@ -905,7 +901,6 @@ static int mwl_debugfs_tx_hist_show(struct seq_file *s, void *data)
 		dump_tx_hist(s, sta_info);
 		seq_puts(s, "============================\n");
 	}
-	spin_unlock_bh(&priv->sta_lock);
 
 	return 0;
 }
@@ -925,12 +920,12 @@ static ssize_t mwl_debugfs_tx_hist_write(struct file *file,
 
 	if (!reset) {
 		memset(&priv->ra_tx_attempt, 0, 2 * 6 * sizeof(u32));
-		spin_lock_bh(&priv->sta_lock);
-		list_for_each_entry(sta_info, &priv->sta_list, list) {
-			memset(&sta_info->tx_hist, 0,
-			       sizeof(sta_info->tx_hist));
+		scoped_guard(spinlock_bh, &priv->sta_lock) {
+			list_for_each_entry(sta_info, &priv->sta_list, list) {
+				memset(&sta_info->tx_hist, 0,
+				       sizeof(sta_info->tx_hist));
+			}
 		}
-		spin_unlock_bh(&priv->sta_lock);
 	}
 
 	return count;
@@ -972,7 +967,7 @@ static int mwl_debugfs_ba_hist_show(struct seq_file *s, void *data)
 	/* The accounting path writes the histogram, and a write to this
 	 * file frees it, under sta_lock.
 	 */
-	spin_lock_bh(&priv->sta_lock);
+	guard(spinlock_bh)(&priv->sta_lock);
 	sta_info = mwl_debugfs_find_sta_locked(priv, priv->ba_aid);
 	if (sta_info && sta_info->ba_hist.enable &&
 	    sta_info->ba_hist.ba_stats) {
@@ -1028,7 +1023,6 @@ static int mwl_debugfs_ba_hist_show(struct seq_file *s, void *data)
 		seq_printf(s, "No BA histogram for sta aid: %d\n",
 			   priv->ba_aid);
 	}
-	spin_unlock_bh(&priv->sta_lock);
 
 	return 0;
 }
@@ -1059,31 +1053,31 @@ static ssize_t mwl_debugfs_ba_hist_write(struct file *file,
 		return ret;
 	}
 
-	spin_lock_bh(&priv->sta_lock);
-	if (priv->ba_aid) {
-		sta_info = mwl_debugfs_find_sta_locked(priv, priv->ba_aid);
+	scoped_guard(spinlock_bh, &priv->sta_lock) {
+		if (priv->ba_aid) {
+			sta_info = mwl_debugfs_find_sta_locked(priv, priv->ba_aid);
+			if (sta_info) {
+				sta_info->ba_hist.enable = false;
+				old_stats = sta_info->ba_hist.ba_stats;
+				sta_info->ba_hist.ba_stats = NULL;
+			}
+		}
+		priv->ba_aid = 0;
+		sta_info = mwl_debugfs_find_sta_locked(priv, sta_aid);
 		if (sta_info) {
-			sta_info->ba_hist.enable = false;
+			/* The same station may have been selected before. */
+			kfree(old_stats);
 			old_stats = sta_info->ba_hist.ba_stats;
-			sta_info->ba_hist.ba_stats = NULL;
+			sta_info->ba_hist.ba_stats = ba_stats;
+			sta_info->ba_hist.index = 0;
+			sta_info->ba_hist.enable = true;
+			priv->ba_aid = sta_aid;
+			ba_stats = NULL;
+			ret = count;
+		} else {
+			ret = -EINVAL;
 		}
 	}
-	priv->ba_aid = 0;
-	sta_info = mwl_debugfs_find_sta_locked(priv, sta_aid);
-	if (sta_info) {
-		/* The same station may have been selected before. */
-		kfree(old_stats);
-		old_stats = sta_info->ba_hist.ba_stats;
-		sta_info->ba_hist.ba_stats = ba_stats;
-		sta_info->ba_hist.index = 0;
-		sta_info->ba_hist.enable = true;
-		priv->ba_aid = sta_aid;
-		ba_stats = NULL;
-		ret = count;
-	} else {
-		ret = -EINVAL;
-	}
-	spin_unlock_bh(&priv->sta_lock);
 
 	kfree(old_stats);
 	kfree(ba_stats);

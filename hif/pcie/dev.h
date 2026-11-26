@@ -1096,11 +1096,10 @@ static inline void pcie_arm_tx_poll(struct pcie_priv *pcie_priv)
 static inline void pcie_mask_int(struct pcie_priv *pcie_priv,
 				 u32 mask_bit, bool set)
 {
-	unsigned long flags;
 	void __iomem *int_status_mask;
 	u32 status;
 
-	spin_lock_irqsave(&pcie_priv->int_mask_lock, flags);
+	guard(spinlock_irqsave)(&pcie_priv->int_mask_lock);
 	int_status_mask = pcie_priv->iobase1 +
 		MACREG_REG_A2H_INTERRUPT_STATUS_MASK;
 	status = readl(int_status_mask);
@@ -1108,7 +1107,6 @@ static inline void pcie_mask_int(struct pcie_priv *pcie_priv,
 		writel((status | mask_bit), int_status_mask);
 	else
 		writel((status & ~mask_bit), int_status_mask);
-	spin_unlock_irqrestore(&pcie_priv->int_mask_lock, flags);
 }
 
 #endif /* _DEV_H_ */

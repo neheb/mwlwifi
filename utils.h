@@ -72,12 +72,10 @@ static inline int utils_assign_stnid(struct mwl_priv *priv, int macid, u16 aid)
 	int stnid;
 	int i;
 
-	spin_lock_bh(&priv->stnid_lock);
+	guard(spinlock_bh)(&priv->stnid_lock);
 	stnid = priv->available_stnid;
-	if (stnid >= priv->stnid_num) {
-		spin_unlock_bh(&priv->stnid_lock);
+	if (stnid >= priv->stnid_num)
 		return 0;
-	}
 	priv->stnid[stnid].macid = macid;
 	priv->stnid[stnid].aid = aid;
 	stnid++;
@@ -86,13 +84,12 @@ static inline int utils_assign_stnid(struct mwl_priv *priv, int macid, u16 aid)
 			break;
 	}
 	priv->available_stnid = i;
-	spin_unlock_bh(&priv->stnid_lock);
 	return stnid;
 }
 
 static inline void utils_free_stnid(struct mwl_priv *priv, u16 stnid)
 {
-	spin_lock_bh(&priv->stnid_lock);
+	guard(spinlock_bh)(&priv->stnid_lock);
 	if (stnid && (stnid <= priv->stnid_num)) {
 		stnid--;
 		priv->stnid[stnid].macid = 0;
@@ -100,7 +97,6 @@ static inline void utils_free_stnid(struct mwl_priv *priv, u16 stnid)
 		if (priv->available_stnid > stnid)
 			priv->available_stnid = stnid;
 	}
-	spin_unlock_bh(&priv->stnid_lock);
 }
 
 int utils_get_phy_rate(u8 format, u8 bandwidth, u8 short_gi, u8 mcs_id);

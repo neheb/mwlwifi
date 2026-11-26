@@ -251,7 +251,7 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 	dma_addr_t dma;
 	u32 index;
 
-	spin_lock_bh(&pcie_priv->tx_desc_lock);
+	guard(spinlock_bh)(&pcie_priv->tx_desc_lock);
 
 	tx_send_tail = desc->tx_sent_tail;
 	tx_send_head_new = desc->tx_sent_head;
@@ -264,7 +264,6 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 
 		if (((tx_send_head_new + 1) & (MAX_NUM_TX_DESC-1)) ==
 		    tx_send_tail) {
-			spin_unlock_bh(&pcie_priv->tx_desc_lock);
 			return -EAGAIN;
 		}
 	}
@@ -329,7 +328,6 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 		ieee80211_free_txskb(priv->hw, tx_skb);
 		wiphy_err(priv->hw->wiphy,
 			  "failed to map pci memory!\n");
-		spin_unlock_bh(&pcie_priv->tx_desc_lock);
 		return -EIO;
 	}
 
@@ -339,7 +337,6 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 				 DMA_TO_DEVICE);
 		ieee80211_free_txskb(priv->hw, tx_skb);
 		wiphy_err(priv->hw->wiphy, "no free TX buffer slot\n");
-		spin_unlock_bh(&pcie_priv->tx_desc_lock);
 		return -ENOSPC;
 	}
 	pnext_tx_desc->data = cpu_to_le32(dma);
@@ -364,8 +361,6 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 	wmb(); /*Data Memory Barrier*/
 	writel(tx_send_head_new, pcie_priv->iobase1 + MACREG_REG_TXSENDHEAD);
 	desc->tx_desc_busy_cnt++;
-
-	spin_unlock_bh(&pcie_priv->tx_desc_lock);
 
 	return 0;
 }
@@ -511,7 +506,7 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 	struct tx_ring_done *ptx_ring_done;
 	u32 index;
 
-	spin_lock_bh(&pcie_priv->tx_desc_lock);
+	guard(spinlock_bh)(&pcie_priv->tx_desc_lock);
 
 	tx_done_head = readl(pcie_priv->iobase1 +
 			     MACREG_REG_TXDONEHEAD);
@@ -547,8 +542,6 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 	writel(tx_done_tail, pcie_priv->iobase1 +
 	       MACREG_REG_TXDONETAIL);
 	desc->tx_done_tail = tx_done_tail;
-
-	spin_unlock_bh(&pcie_priv->tx_desc_lock);
 }
 
 void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
@@ -787,12 +780,12 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 
 	/* Initiate the ampdu session here */
 	if (start_ba_session) {
-		spin_lock_bh(&priv->stream_lock);
-		if (mwl_fwcmd_start_stream(hw, stream))
-			mwl_fwcmd_remove_stream(hw, stream);
-		stream->jiffies = jiffies;
-		stream->start_time = stream->jiffies;
-		stream->desc_num = index;
-		spin_unlock_bh(&priv->stream_lock);
+		scoped_guard(spinlock_bh, &priv->stream_lock) {
+			if (mwl_fwcmd_start_stream(hw, stream))
+				mwl_fwcmd_remove_stream(hw, stream);
+			stream->jiffies = jiffies;
+			stream->start_time = stream->jiffies;
+			stream->desc_num = index;
+		}
 	}
 }

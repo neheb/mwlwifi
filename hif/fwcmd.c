@@ -1831,11 +1831,11 @@ int mwl_fwcmd_set_beacon(struct ieee80211_hw *hw,
 	if (!data)
 		return -ENOMEM;
 
-	spin_lock_bh(&priv->vif_lock);
-	old = mwl_vif->beacon_data;
-	mwl_vif->beacon_data = data;
-	mwl_fwcmd_parse_beacon(priv, mwl_vif, data, len);
-	spin_unlock_bh(&priv->vif_lock);
+	scoped_guard(spinlock_bh, &priv->vif_lock) {
+		old = mwl_vif->beacon_data;
+		mwl_vif->beacon_data = data;
+		mwl_fwcmd_parse_beacon(priv, mwl_vif, data, len);
+	}
 	kfree(old);
 
 	if (!b_inf->valid)

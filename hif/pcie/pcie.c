@@ -577,7 +577,7 @@ static void pcie_timer_routine(struct ieee80211_hw *hw)
 		return;
 	priv->jiffies_ampdu = jiffies;
 
-	spin_lock_bh(&priv->stream_lock);
+	guard(spinlock_bh)(&priv->stream_lock);
 	for (i = 0; i < priv->ampdu_num; i++) {
 		stream = &priv->ampdu[i];
 
@@ -601,7 +601,6 @@ static void pcie_timer_routine(struct ieee80211_hw *hw)
 			}
 		}
 	}
-	spin_unlock_bh(&priv->stream_lock);
 }
 
 static void pcie_8997_tx_return_pkts(struct ieee80211_hw *hw)
@@ -1452,9 +1451,8 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 			acnt_tx = (struct acnt_tx_s *)pstart;
 			sta_info = utils_find_sta(priv, acnt_tx->hdr.wh.addr1);
 			if (sta_info) {
-				spin_lock_bh(&priv->sta_lock);
-				pcie_tx_account(priv, sta_info, acnt_tx);
-				spin_unlock_bh(&priv->sta_lock);
+				scoped_guard(spinlock_bh, &priv->sta_lock)
+					pcie_tx_account(priv, sta_info, acnt_tx);
 			}
 			break;
 		case ACNT_CODE_RX_PPDU:
@@ -1480,9 +1478,8 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 				&acnt_rx->rx_info.hdr[0];
 			sta_info = utils_find_sta(priv, dma_data->wh.addr2);
 			if (sta_info) {
-				spin_lock_bh(&priv->sta_lock);
-				pcie_rx_account(priv, sta_info, acnt_rx);
-				spin_unlock_bh(&priv->sta_lock);
+				scoped_guard(spinlock_bh, &priv->sta_lock)
+					pcie_rx_account(priv, sta_info, acnt_rx);
 			}
 			break;
 		case ACNT_CODE_RA_STATS:
@@ -1507,9 +1504,8 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 				}
 				sta_info = utils_find_sta_by_id(priv, stnid);
 				if (sta_info) {
-					spin_lock_bh(&priv->sta_lock);
-					pcie_tx_per(priv, sta_info, acnt_ra);
-					spin_unlock_bh(&priv->sta_lock);
+					scoped_guard(spinlock_bh, &priv->sta_lock)
+						pcie_tx_per(priv, sta_info, acnt_ra);
 				}
 			}
 			break;
@@ -1519,10 +1515,10 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 				sta_info = utils_find_sta_by_aid(priv,
 								 priv->ba_aid);
 				if (sta_info) {
-					spin_lock_bh(&priv->sta_lock);
-					pcie_ba_account(priv, sta_info,
-							acnt_ba);
-					spin_unlock_bh(&priv->sta_lock);
+					scoped_guard(spinlock_bh, &priv->sta_lock) {
+						pcie_ba_account(priv, sta_info,
+								acnt_ba);
+					}
 				}
 			}
 			break;
