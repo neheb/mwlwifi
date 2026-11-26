@@ -257,9 +257,12 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 	tx_send_head_new = desc->tx_sent_head;
 
 	if (((tx_send_head_new + 1) & (MAX_NUM_TX_DESC-1)) == tx_send_tail) {
-		/* Update the tx_send_tail */
+		/* Mask it like the other ring indices read from the
+		 * device.
+		 */
 		tx_send_tail = readl(pcie_priv->iobase1 +
-				     MACREG_REG_TXSEDNTAIL);
+				     MACREG_REG_TXSEDNTAIL) &
+			       (MAX_NUM_TX_DESC - 1);
 		desc->tx_sent_tail = tx_send_tail;
 
 		if (((tx_send_head_new + 1) & (MAX_NUM_TX_DESC-1)) ==
