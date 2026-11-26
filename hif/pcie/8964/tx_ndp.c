@@ -70,7 +70,6 @@ static int pcie_tx_ring_alloc_ndp(struct mwl_priv *priv)
 	if (!mem)
 		goto err_no_mem;
 	desc->ptx_ring = mem;
-	memset(desc->ptx_ring, 0x00, MAX_NUM_TX_RING_BYTES);
 
 	mem = dma_alloc_coherent(priv->dev,
 				 MAX_NUM_TX_RING_DONE_BYTES,
@@ -79,7 +78,6 @@ static int pcie_tx_ring_alloc_ndp(struct mwl_priv *priv)
 	if (!mem)
 		goto err_no_mem;
 	desc->ptx_ring_done = mem;
-	memset(desc->ptx_ring_done, 0x00, MAX_NUM_TX_RING_DONE_BYTES);
 
 	mem = dma_alloc_coherent(priv->dev,
 				 DEFAULT_ACNT_RING_SIZE,
@@ -88,7 +86,6 @@ static int pcie_tx_ring_alloc_ndp(struct mwl_priv *priv)
 	if (!mem)
 		goto err_no_mem;
 	desc->pacnt_ring = mem;
-	memset(desc->pacnt_ring, 0x00, DEFAULT_ACNT_RING_SIZE);
 
 	desc->pacnt_buf = kzalloc(DEFAULT_ACNT_RING_SIZE, GFP_KERNEL);
 	if (!desc->pacnt_buf)
