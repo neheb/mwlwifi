@@ -984,7 +984,10 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 			break;
 		}
 
-		if (!stream) {
+		/* The 88W8964 looks up a fixed slot, which is unused if the
+		 * driver didn't start this session itself.
+		 */
+		if (!stream || stream->state == AMPDU_NO_STREAM) {
 			stream = mwl_fwcmd_add_stream(hw, sta, tid);
 			if (!stream) {
 				wiphy_warn(hw->wiphy, "no stream found\n");
