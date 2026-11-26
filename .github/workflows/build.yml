@@ -1,0 +1,36 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: linux-${{ matrix.kernel }} ${{ matrix.arch }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # Oldest supported mac80211 and the current stable release
+        kernel: ['6.18', '7.3']
+        arch: [x86_64, arm]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison flex libelf-dev libssl-dev sparse clang lld llvm
+
+      - name: Cache kernel build
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/ci/build-${{ matrix.kernel }}-${{ matrix.arch }}
+          key: kbuild-${{ matrix.kernel }}-${{ matrix.arch }}-${{ hashFiles('.github/ci-build.sh') }}
+
+      - name: Build with W=1 and sparse
+        run: .github/ci-build.sh ${{ matrix.kernel }} ${{ matrix.arch }} ${{ runner.temp }}/ci
