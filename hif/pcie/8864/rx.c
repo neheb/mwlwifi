@@ -215,15 +215,11 @@ static inline void pcie_rx_status(struct mwl_priv *priv,
 
 	rx_rate = le16_to_cpu(pdesc->rate);
 	pcie_rx_prepare_status(priv,
-			       rx_rate & MWL_RX_RATE_FORMAT_MASK,
-			       (rx_rate & MWL_RX_RATE_NSS_MASK) >>
-			       MWL_RX_RATE_NSS_SHIFT,
-			       (rx_rate & MWL_RX_RATE_BW_MASK) >>
-			       MWL_RX_RATE_BW_SHIFT,
-			       (rx_rate & MWL_RX_RATE_GI_MASK) >>
-			       MWL_RX_RATE_GI_SHIFT,
-			       (rx_rate & MWL_RX_RATE_RT_MASK) >>
-			       MWL_RX_RATE_RT_SHIFT,
+			       FIELD_GET(MWL_RX_RATE_FORMAT_MASK, rx_rate),
+			       FIELD_GET(MWL_RX_RATE_NSS_MASK, rx_rate),
+			       FIELD_GET(MWL_RX_RATE_BW_MASK, rx_rate),
+			       FIELD_GET(MWL_RX_RATE_GI_MASK, rx_rate),
+			       FIELD_GET(MWL_RX_RATE_RT_MASK, rx_rate),
 			       status);
 
 	status->freq = ieee80211_channel_to_frequency(pdesc->channel,

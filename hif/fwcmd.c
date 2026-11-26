@@ -1380,9 +1380,9 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 		return -EINVAL;
 	}
 
-	chnl_flags = (freq_band & FREQ_BAND_MASK) |
-		((chnl_width << CHNL_WIDTH_SHIFT) & CHNL_WIDTH_MASK) |
-		((act_primary << ACT_PRIMARY_SHIFT) & ACT_PRIMARY_MASK);
+	chnl_flags = FIELD_PREP(FREQ_BAND_MASK, freq_band) |
+		FIELD_PREP(CHNL_WIDTH_MASK, chnl_width) |
+		FIELD_PREP(ACT_PRIMARY_MASK, act_primary);
 
 	pcmd->chnl_flags = cpu_to_le32(chnl_flags);
 
@@ -2213,9 +2213,9 @@ int mwl_fwcmd_set_switch_channel(struct ieee80211_hw *hw,
 		return -EINVAL;
 	}
 
-	chnl_flags = (freq_band & FREQ_BAND_MASK) |
-		((chnl_width << CHNL_WIDTH_SHIFT) & CHNL_WIDTH_MASK) |
-		((act_primary << ACT_PRIMARY_SHIFT) & ACT_PRIMARY_MASK);
+	chnl_flags = FIELD_PREP(FREQ_BAND_MASK, freq_band) |
+		FIELD_PREP(CHNL_WIDTH_MASK, chnl_width) |
+		FIELD_PREP(ACT_PRIMARY_MASK, act_primary);
 
 	pcmd = priv->pcmd_buf;
 
@@ -2434,8 +2434,8 @@ int mwl_fwcmd_check_ba(struct ieee80211_hw *hw,
 	pcmd->ba_info.create_params.tid = stream->tid;
 	ba_type = BA_FLAG_IMMEDIATE_TYPE;
 	ba_direction = direction;
-	ba_flags = (ba_type & BA_TYPE_MASK) |
-		((ba_direction << BA_DIRECTION_SHIFT) & BA_DIRECTION_MASK);
+	ba_flags = FIELD_PREP(BA_TYPE_MASK, ba_type) |
+		FIELD_PREP(BA_DIRECTION_MASK, ba_direction);
 	pcmd->ba_info.create_params.flags = cpu_to_le32(ba_flags);
 	pcmd->ba_info.create_params.queue_id = stream->idx;
 
@@ -2480,22 +2480,20 @@ int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 	ba_direction = direction;
 	if (priv->chip_type == MWL8964) {
 		ba_type = amsdu ? MWL_AMSDU_SIZE_11K : 0;
-		ba_flags = (ba_type & BA_TYPE_MASK_NDP) |
-			((ba_direction << BA_DIRECTION_SHIFT_NDP) &
-			BA_DIRECTION_MASK_NDP);
+		ba_flags = FIELD_PREP(BA_TYPE_MASK_NDP, ba_type) |
+			FIELD_PREP(BA_DIRECTION_MASK_NDP, ba_direction);
 	} else {
 		ba_type = BA_FLAG_IMMEDIATE_TYPE;
-		ba_flags = (ba_type & BA_TYPE_MASK) |
-			((ba_direction << BA_DIRECTION_SHIFT) &
-			BA_DIRECTION_MASK);
+		ba_flags = FIELD_PREP(BA_TYPE_MASK, ba_type) |
+			FIELD_PREP(BA_DIRECTION_MASK, ba_direction);
 	}
 	pcmd->ba_info.create_params.flags = cpu_to_le32(ba_flags);
 	pcmd->ba_info.create_params.queue_id = stream->idx;
 	pcmd->ba_info.create_params.param_info =
-		(stream->sta->deflink.ht_cap.ampdu_factor &
-		 IEEE80211_HT_AMPDU_PARM_FACTOR) |
-		((stream->sta->deflink.ht_cap.ampdu_density << 2) &
-		 IEEE80211_HT_AMPDU_PARM_DENSITY);
+		FIELD_PREP(IEEE80211_HT_AMPDU_PARM_FACTOR,
+			   stream->sta->deflink.ht_cap.ampdu_factor) |
+		FIELD_PREP(IEEE80211_HT_AMPDU_PARM_DENSITY,
+			   stream->sta->deflink.ht_cap.ampdu_density);
 	if (direction == BA_FLAG_DIRECTION_UP) {
 		pcmd->ba_info.create_params.reset_seq_no = 0;
 		pcmd->ba_info.create_params.current_seq = cpu_to_le16(seqno);
@@ -2506,9 +2504,9 @@ int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 	if (priv->chip_type == MWL8964 &&
 	    stream->sta->deflink.vht_cap.vht_supported) {
 		pcmd->ba_info.create_params.vht_rx_factor =
-			cpu_to_le32((stream->sta->deflink.vht_cap.cap  &
-			IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK) >>
-			IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_SHIFT);
+			cpu_to_le32(FIELD_GET(
+				IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK,
+				stream->sta->deflink.vht_cap.cap));
 	}
 
 	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_BASTREAM))
@@ -2543,13 +2541,11 @@ int mwl_fwcmd_destroy_ba(struct ieee80211_hw *hw,
 	ba_type = 0;
 	ba_direction = direction;
 	if (priv->chip_type == MWL8964)
-		ba_flags = (ba_type & BA_TYPE_MASK_NDP) |
-			((ba_direction << BA_DIRECTION_SHIFT_NDP) &
-			BA_DIRECTION_MASK_NDP);
+		ba_flags = FIELD_PREP(BA_TYPE_MASK_NDP, ba_type) |
+			FIELD_PREP(BA_DIRECTION_MASK_NDP, ba_direction);
 	else
-		ba_flags = (ba_type & BA_TYPE_MASK) |
-			((ba_direction << BA_DIRECTION_SHIFT) &
-			BA_DIRECTION_MASK);
+		ba_flags = FIELD_PREP(BA_TYPE_MASK, ba_type) |
+			FIELD_PREP(BA_DIRECTION_MASK, ba_direction);
 	pcmd->ba_info.destroy_params.flags = cpu_to_le32(ba_flags);
 	pcmd->ba_info.destroy_params.fw_ba_context.context =
 		cpu_to_le32(stream->idx);
@@ -3261,19 +3257,16 @@ int mwl_fwcmd_config_EDMACCtrl(struct ieee80211_hw *hw, int EDMAC_Ctrl)
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_EDMAC_CTRL);
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->action = cpu_to_le16(WL_SET);
-	pcmd->ed_ctrl_2g = cpu_to_le16((EDMAC_Ctrl & EDMAC_2G_ENABLE_MASK)
-				       >> EDMAC_2G_ENABLE_SHIFT);
-	pcmd->ed_ctrl_5g = cpu_to_le16((EDMAC_Ctrl & EDMAC_5G_ENABLE_MASK)
-				       >> EDMAC_5G_ENABLE_SHIFT);
-	pcmd->ed_offset_2g = cpu_to_le16((EDMAC_Ctrl &
-					 EDMAC_2G_THRESHOLD_OFFSET_MASK)
-					 >> EDMAC_2G_THRESHOLD_OFFSET_SHIFT);
-	pcmd->ed_offset_5g = cpu_to_le16((EDMAC_Ctrl &
-					 EDMAC_5G_THRESHOLD_OFFSET_MASK)
-					 >> EDMAC_5G_THRESHOLD_OFFSET_SHIFT);
-	pcmd->ed_bitmap_txq_lock = cpu_to_le16((EDMAC_Ctrl &
-					       EDMAC_QLOCK_BITMAP_MASK)
-					       >> EDMAC_QLOCK_BITMAP_SHIFT);
+	pcmd->ed_ctrl_2g =
+		cpu_to_le16(FIELD_GET(EDMAC_2G_ENABLE_MASK, EDMAC_Ctrl));
+	pcmd->ed_ctrl_5g =
+		cpu_to_le16(FIELD_GET(EDMAC_5G_ENABLE_MASK, EDMAC_Ctrl));
+	pcmd->ed_offset_2g =
+		cpu_to_le16(FIELD_GET(EDMAC_2G_THRESHOLD_OFFSET_MASK, EDMAC_Ctrl));
+	pcmd->ed_offset_5g =
+		cpu_to_le16(FIELD_GET(EDMAC_5G_THRESHOLD_OFFSET_MASK, EDMAC_Ctrl));
+	pcmd->ed_bitmap_txq_lock =
+		cpu_to_le16(FIELD_GET(EDMAC_QLOCK_BITMAP_MASK, EDMAC_Ctrl));
 
 	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_EDMAC_CTRL))
 		return -EIO;

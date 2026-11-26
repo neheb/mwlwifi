@@ -1119,13 +1119,10 @@ static void pcie_tx_account(struct mwl_priv *priv,
 	if (!tx_hist || (type >= SU_MU_TYPE_CNT))
 		return;
 
-	format = rate_info & MWL_TX_RATE_FORMAT_MASK;
-	bw = (rate_info & MWL_TX_RATE_BANDWIDTH_MASK) >>
-		MWL_TX_RATE_BANDWIDTH_SHIFT;
-	gi = (rate_info & MWL_TX_RATE_SHORTGI_MASK) >>
-		MWL_TX_RATE_SHORTGI_SHIFT;
-	mcs = (rate_info & MWL_TX_RATE_RATEIDMCS_MASK) >>
-		MWL_TX_RATE_RATEIDMCS_SHIFT;
+	format = FIELD_GET(MWL_TX_RATE_FORMAT_MASK, rate_info);
+	bw = FIELD_GET(MWL_TX_RATE_BANDWIDTH_MASK, rate_info);
+	gi = FIELD_GET(MWL_TX_RATE_SHORTGI_MASK, rate_info);
+	mcs = FIELD_GET(MWL_TX_RATE_RATEIDMCS_MASK, rate_info);
 
 	tx_hist->cur_rate_info[type] = rate_info;
 
@@ -1303,13 +1300,10 @@ static void pcie_tx_per(struct mwl_priv *priv, struct mwl_sta *sta_info,
 	else
 		per_index = 0;
 
-	format = rate_info & MWL_TX_RATE_FORMAT_MASK;
-	bw = (rate_info & MWL_TX_RATE_BANDWIDTH_MASK) >>
-		MWL_TX_RATE_BANDWIDTH_SHIFT;
-	gi = (rate_info & MWL_TX_RATE_SHORTGI_MASK) >>
-		MWL_TX_RATE_SHORTGI_SHIFT;
-	mcs = (rate_info & MWL_TX_RATE_RATEIDMCS_MASK) >>
-		MWL_TX_RATE_RATEIDMCS_SHIFT;
+	format = FIELD_GET(MWL_TX_RATE_FORMAT_MASK, rate_info);
+	bw = FIELD_GET(MWL_TX_RATE_BANDWIDTH_MASK, rate_info);
+	gi = FIELD_GET(MWL_TX_RATE_SHORTGI_MASK, rate_info);
+	mcs = FIELD_GET(MWL_TX_RATE_RATEIDMCS_MASK, rate_info);
 
 	/* Rate table index is valid */
 	if (index != 0xff) {

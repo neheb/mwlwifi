@@ -242,9 +242,10 @@ u32 utils_get_init_tx_rate(struct mwl_priv *priv, struct ieee80211_conf *conf,
 		break;
 	}
 
-	tx_rate = (format | (bw << MWL_TX_RATE_BANDWIDTH_SHIFT) |
-		(TX_RATE_INFO_SHORT_GI << MWL_TX_RATE_SHORTGI_SHIFT) |
-		(rate_mcs << MWL_TX_RATE_RATEIDMCS_SHIFT));
+	tx_rate = FIELD_PREP(MWL_TX_RATE_FORMAT_MASK, format) |
+		FIELD_PREP(MWL_TX_RATE_BANDWIDTH_MASK, bw) |
+		FIELD_PREP(MWL_TX_RATE_SHORTGI_MASK, TX_RATE_INFO_SHORT_GI) |
+		FIELD_PREP(MWL_TX_RATE_RATEIDMCS_MASK, rate_mcs);
 
 	return tx_rate;
 }

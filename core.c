@@ -549,7 +549,7 @@ static void mwl_set_ht_caps(struct mwl_priv *priv,
 	if ((priv->chip_type == MWL8997) &&
 	    (priv->antenna_tx != ANTENNA_TX_1)) {
 		band->ht_cap.cap |= IEEE80211_HT_CAP_TX_STBC;
-		band->ht_cap.cap |= (1 << IEEE80211_HT_CAP_RX_STBC_SHIFT);
+		band->ht_cap.cap |= FIELD_PREP(IEEE80211_HT_CAP_RX_STBC, 1);
 	}
 
 	ieee80211_hw_set(hw, AMPDU_AGGREGATION);
@@ -630,17 +630,15 @@ static void mwl_set_vht_caps(struct mwl_priv *priv,
 	if (band->vht_cap.cap & (IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE |
 	    IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE)) {
 		band->vht_cap.cap |=
-			((antenna_num - 1) <<
-			IEEE80211_VHT_CAP_BEAMFORMEE_STS_SHIFT) &
-			IEEE80211_VHT_CAP_BEAMFORMEE_STS_MASK;
+			FIELD_PREP(IEEE80211_VHT_CAP_BEAMFORMEE_STS_MASK,
+				   antenna_num - 1);
 	}
 
 	if (band->vht_cap.cap & (IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE |
 	    IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE)) {
 		band->vht_cap.cap |=
-			((antenna_num - 1) <<
-			IEEE80211_VHT_CAP_SOUNDING_DIMENSIONS_SHIFT) &
-			IEEE80211_VHT_CAP_SOUNDING_DIMENSIONS_MASK;
+			FIELD_PREP(IEEE80211_VHT_CAP_SOUNDING_DIMENSIONS_MASK,
+				   antenna_num - 1);
 	}
 }
 

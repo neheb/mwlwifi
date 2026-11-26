@@ -18,6 +18,7 @@
 #ifndef _CORE_H_
 #define _CORE_H_
 
+#include <linux/bitfield.h>
 #include <linux/interrupt.h>
 #include <linux/firmware.h>
 #include <linux/of.h>
@@ -68,29 +69,20 @@
 
 /* tx rate information */
 /* 0: legacy format 1: 11n format 2: 11ac format */
-#define MWL_TX_RATE_FORMAT_MASK       0x00000003
-#define MWL_TX_RATE_STBC_MASK         0x00000004
-#define MWL_TX_RATE_STBC_SHIFT        2
+#define MWL_TX_RATE_FORMAT_MASK       GENMASK(1, 0)
+#define MWL_TX_RATE_STBC_MASK         BIT(2)
 /* 0: 20 MHz 1: 40 MHz 2: 80 MHz 3: 160 MHz      */
-#define MWL_TX_RATE_BANDWIDTH_MASK    0x00000030
-#define MWL_TX_RATE_BANDWIDTH_SHIFT   4
+#define MWL_TX_RATE_BANDWIDTH_MASK    GENMASK(5, 4)
 /* 0: normal 1: short                            */
-#define MWL_TX_RATE_SHORTGI_MASK      0x00000040
-#define MWL_TX_RATE_SHORTGI_SHIFT     6
-#define MWL_TX_RATE_RATEIDMCS_MASK    0x00007F00
-#define MWL_TX_RATE_RATEIDMCS_SHIFT   8
+#define MWL_TX_RATE_SHORTGI_MASK      BIT(6)
+#define MWL_TX_RATE_RATEIDMCS_MASK    GENMASK(14, 8)
 /* 0: long   1: short                            */
-#define MWL_TX_RATE_PREAMBLE_MASK     0x00008000
-#define MWL_TX_RATE_PREAMBLE_SHIFT    15
-#define MWL_TX_RATE_POWERID_MASK      0x003F0000
-#define MWL_TX_RATE_POWERID_SHIFT     16
-#define MWL_TX_RATE_ADVCODING_MASK    0x00400000
-#define MWL_TX_RATE_ADVCODING_SHIFT   22
+#define MWL_TX_RATE_PREAMBLE_MASK     BIT(15)
+#define MWL_TX_RATE_POWERID_MASK      GENMASK(21, 16)
+#define MWL_TX_RATE_ADVCODING_MASK    BIT(22)
 /* 0: beam forming off 1: beam forming on        */
-#define MWL_TX_RATE_BF_MASK           0x00800000
-#define MWL_TX_RATE_BF_SHIFT          23
-#define MWL_TX_RATE_ANTSELECT_MASK    0xFF000000
-#define MWL_TX_RATE_ANTSELECT_SHIFT   24
+#define MWL_TX_RATE_BF_MASK           BIT(23)
+#define MWL_TX_RATE_ANTSELECT_MASK    GENMASK(31, 24)
 
 #define ACNT_BA_SIZE                  1000
 

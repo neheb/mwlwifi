@@ -202,13 +202,10 @@ static void dump_tx_hist_su(char *p, int size, int *len, bool su, bool *printed,
 				tx_hist->total_tx_cnt[SU_MIMO]);
 				*printed = true;
 			}
-			format = rateinfo & MWL_TX_RATE_FORMAT_MASK;
-			bw = (rateinfo & MWL_TX_RATE_BANDWIDTH_MASK) >>
-				MWL_TX_RATE_BANDWIDTH_SHIFT;
-			sgi = (rateinfo & MWL_TX_RATE_SHORTGI_MASK) >>
-				MWL_TX_RATE_SHORTGI_SHIFT;
-			mcs = (rateinfo & MWL_TX_RATE_RATEIDMCS_MASK) >>
-				MWL_TX_RATE_RATEIDMCS_SHIFT;
+			format = FIELD_GET(MWL_TX_RATE_FORMAT_MASK, rateinfo);
+			bw = FIELD_GET(MWL_TX_RATE_BANDWIDTH_MASK, rateinfo);
+			sgi = FIELD_GET(MWL_TX_RATE_SHORTGI_MASK, rateinfo);
+			mcs = FIELD_GET(MWL_TX_RATE_RATEIDMCS_MASK, rateinfo);
 			if (format == TX_RATE_FORMAT_LEGACY)
 				ratemask = 0xfff;
 			else
@@ -1126,25 +1123,16 @@ static ssize_t mwl_debugfs_ratetable_read(struct file *file, char __user *ubuf,
 	rate_idx = rate_table;
 	rate_info = le32_to_cpu(*(__le32 *)rate_idx);
 	while (rate_info && idx < SYSADPT_MAX_RATE_ADAPT_RATES) {
-		fmt = rate_info & MWL_TX_RATE_FORMAT_MASK;
-		stbc = (rate_info & MWL_TX_RATE_STBC_MASK) >>
-			MWL_TX_RATE_STBC_SHIFT;
-		bw = (rate_info & MWL_TX_RATE_BANDWIDTH_MASK) >>
-			MWL_TX_RATE_BANDWIDTH_SHIFT;
-		sgi = (rate_info & MWL_TX_RATE_SHORTGI_MASK) >>
-			MWL_TX_RATE_SHORTGI_SHIFT;
-		mcs = (rate_info & MWL_TX_RATE_RATEIDMCS_MASK) >>
-			MWL_TX_RATE_RATEIDMCS_SHIFT;
-		preamble_gf = (rate_info & MWL_TX_RATE_PREAMBLE_MASK) >>
-			MWL_TX_RATE_PREAMBLE_SHIFT;
-		power_id = (rate_info & MWL_TX_RATE_POWERID_MASK) >>
-			MWL_TX_RATE_POWERID_SHIFT;
-		ldpc = (rate_info & MWL_TX_RATE_ADVCODING_MASK) >>
-			MWL_TX_RATE_ADVCODING_SHIFT;
-		bf = (rate_info & MWL_TX_RATE_BF_MASK) >>
-			MWL_TX_RATE_BF_SHIFT;
-		ant = (rate_info & MWL_TX_RATE_ANTSELECT_MASK) >>
-			MWL_TX_RATE_ANTSELECT_SHIFT;
+		fmt = FIELD_GET(MWL_TX_RATE_FORMAT_MASK, rate_info);
+		stbc = FIELD_GET(MWL_TX_RATE_STBC_MASK, rate_info);
+		bw = FIELD_GET(MWL_TX_RATE_BANDWIDTH_MASK, rate_info);
+		sgi = FIELD_GET(MWL_TX_RATE_SHORTGI_MASK, rate_info);
+		mcs = FIELD_GET(MWL_TX_RATE_RATEIDMCS_MASK, rate_info);
+		preamble_gf = FIELD_GET(MWL_TX_RATE_PREAMBLE_MASK, rate_info);
+		power_id = FIELD_GET(MWL_TX_RATE_POWERID_MASK, rate_info);
+		ldpc = FIELD_GET(MWL_TX_RATE_ADVCODING_MASK, rate_info);
+		bf = FIELD_GET(MWL_TX_RATE_BF_MASK, rate_info);
+		ant = FIELD_GET(MWL_TX_RATE_ANTSELECT_MASK, rate_info);
 
 		if (fmt == TX_RATE_FORMAT_11AC) {
 			rate = mcs & 0xf; /* 11ac, mcs[3:0]: rate      */

@@ -318,28 +318,29 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 				ieee80211_get_DA(wh));
 
 		if (tx_ctrl->flags & TX_CTRL_EAPOL)
-			ctrl = TXRING_CTRL_TAG_EAP << TXRING_CTRL_TAG_SHIFT;
+			ctrl = FIELD_PREP(TXRING_CTRL_TAG_MASK,
+					  TXRING_CTRL_TAG_EAP);
 		if (tx_ctrl->flags & TX_CTRL_TCP_ACK) {
 			pnext_tx_desc->tcp_dst_src =
 				cpu_to_le32(tx_ctrl->tcp_dst_src);
 			pnext_tx_desc->tcp_sn = cpu_to_le32(tx_ctrl->tcp_sn);
-			ctrl = TXRING_CTRL_TAG_TCP_ACK << TXRING_CTRL_TAG_SHIFT;
+			ctrl = FIELD_PREP(TXRING_CTRL_TAG_MASK,
+					  TXRING_CTRL_TAG_TCP_ACK);
 		}
-		ctrl |= (((tx_ctrl->tx_que_priority & TXRING_CTRL_QID_MASK) <<
-			TXRING_CTRL_QID_SHIFT) |
-			((tx_skb->len & TXRING_CTRL_LEN_MASK) <<
-			TXRING_CTRL_LEN_SHIFT));
+		ctrl |= FIELD_PREP(TXRING_CTRL_QID_MASK,
+				   tx_ctrl->tx_que_priority) |
+			FIELD_PREP(TXRING_CTRL_LEN_MASK, tx_skb->len);
 	} else {
 		/* Assigning rate code; use legacy 6mbps rate. */
-		pnext_tx_desc->u.rate_code = cpu_to_le16(RATECODE_TYPE_LEGACY +
-			(0 << RATECODE_MCS_SHIFT) + RATECODE_BW_20MHZ);
+		pnext_tx_desc->u.rate_code = cpu_to_le16(RATECODE_TYPE_LEGACY |
+			FIELD_PREP(RATECODE_MCS_MASK, 0) | RATECODE_BW_20MHZ);
 		pnext_tx_desc->u.max_retry = 5;
 
-		ctrl = (((tx_ctrl->tx_que_priority & TXRING_CTRL_QID_MASK) <<
-			TXRING_CTRL_QID_SHIFT) |
-			(((tx_skb->len - sizeof(struct pcie_dma_data)) &
-			TXRING_CTRL_LEN_MASK) << TXRING_CTRL_LEN_SHIFT) |
-			(TXRING_CTRL_TAG_MGMT << TXRING_CTRL_TAG_SHIFT));
+		ctrl = FIELD_PREP(TXRING_CTRL_QID_MASK,
+				  tx_ctrl->tx_que_priority) |
+			FIELD_PREP(TXRING_CTRL_LEN_MASK,
+				   tx_skb->len - sizeof(struct pcie_dma_data)) |
+			FIELD_PREP(TXRING_CTRL_TAG_MASK, TXRING_CTRL_TAG_MGMT);
 	}
 
 	dma = dma_map_single(&(pcie_priv->pdev)->dev, tx_skb->data,
@@ -627,7 +628,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 			     MWL_ACTION_CODE(mgmt) ==
 			     WLAN_ACTION_ADDBA_REQ)) {
 			capab = le16_to_cpu(MWL_ADDBA_REQ(mgmt).capab);
-			tid = (capab & IEEE80211_ADDBA_PARAM_TID_MASK) >> 2;
+			tid = FIELD_GET(IEEE80211_ADDBA_PARAM_TID_MASK, capab);
 			if (tid < IEEE80211_FIRST_TSPEC_TSID)
 				index = utils_tid_to_ac(tid);
 		}

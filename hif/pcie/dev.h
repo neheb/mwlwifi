@@ -170,15 +170,11 @@ struct pcie_tx_hndl {
 #define RX_RATE_INFO_LONG_INTERVAL    0
 #define RX_RATE_INFO_SHORT_INTERVAL   1
 
-#define MWL_RX_RATE_FORMAT_MASK       0x0007
-#define MWL_RX_RATE_NSS_MASK          0x0018
-#define MWL_RX_RATE_NSS_SHIFT         3
-#define MWL_RX_RATE_BW_MASK           0x0060
-#define MWL_RX_RATE_BW_SHIFT          5
-#define MWL_RX_RATE_GI_MASK           0x0080
-#define MWL_RX_RATE_GI_SHIFT          7
-#define MWL_RX_RATE_RT_MASK           0xFF00
-#define MWL_RX_RATE_RT_SHIFT          8
+#define MWL_RX_RATE_FORMAT_MASK       GENMASK(2, 0)
+#define MWL_RX_RATE_NSS_MASK          GENMASK(4, 3)
+#define MWL_RX_RATE_BW_MASK           GENMASK(6, 5)
+#define MWL_RX_RATE_GI_MASK           BIT(7)
+#define MWL_RX_RATE_RT_MASK           GENMASK(15, 8)
 
 struct pcie_rx_desc {
 	__le16 pkt_len;              /* total length of received data      */
@@ -301,8 +297,7 @@ struct pcie_dma_data {
  *     * BW is used to request legacy duplicate modes;
  */
 #define RATECODE_DEFAULT        0xFFFF  /* Don't override the Rate            */
-#define RATECODE_TYPE_MASK      0xC000  /* Mask  to extract Type              */
-#define RATECODE_TYPE_SHIFT     14      /* Shift to extract Type              */
+#define RATECODE_TYPE_MASK      GENMASK(15, 14) /* Mask  to extract Type */
 #define RATECODE_TYPE_VHT       0x8000  /* Use VHT rates                      */
 #define RATECODE_TYPE_HT        0x4000  /* Use HT rates                       */
 #define RATECODE_TYPE_LEGACY    0x0000  /* Use Legacy (a/b/g) rates           */
@@ -310,12 +305,9 @@ struct pcie_dma_data {
 #define RATECODE_RSVD           0x1000  /* Unused                             */
 #define RATECODE_STBC           0x0800  /* Use Space Time Block Codes         */
 #define RATECODE_BFMR           0x0400  /* Use Beamforming                    */
-#define RATECODE_SS_MASK        0x0300  /* Mask  to extract nSS-1             */
-#define RATECODE_SS_SHIFT       8       /* Shift to extract nSS-1             */
-#define RATECODE_MCS_MASK       0x00F0  /* Mask  to extract MCS rate          */
-#define RATECODE_MCS_SHIFT      4       /* Shift to extract MCS rate          */
-#define RATECODE_BW_MASK        0x000C  /* Mask  to extract Channel BW        */
-#define RATECODE_BW_SHIFT       2       /* Shift to extract Channel BW        */
+#define RATECODE_SS_MASK        GENMASK(9, 8)   /* Mask  to extract nSS-1 */
+#define RATECODE_MCS_MASK       GENMASK(7, 4)   /* Mask  to extract MCS rate */
+#define RATECODE_BW_MASK        GENMASK(3, 2)   /* Mask  to extract Channel BW */
 #define RATECODE_BW_160MHZ      0x000C  /* Send 160M wide packet (or 80+80)   */
 #define RATECODE_BW_80MHZ       0x0008  /* Send  80M wide packet              */
 #define RATECODE_BW_40MHZ       0x0004  /* Send  40M wide packet              */
@@ -323,12 +315,9 @@ struct pcie_dma_data {
 #define RATECODE_LDPC           0x0002  /* Use Low Density Parity Codes       */
 #define RATECODE_SGI            0x0001  /* Use Short Guard Interval           */
 
-#define TXRING_CTRL_LEN_SHIFT   0      /* PCIe Payload size (Starts w/ SNAP)  */
-#define TXRING_CTRL_LEN_MASK    0x3FFF /* PCIe Payload size (Starts w/ SNAP)  */
-#define TXRING_CTRL_QID_SHIFT   14     /* Queue ID (STA*UP, Mcast, MC2UC, etc)*/
-#define TXRING_CTRL_QID_MASK    0xFFF  /* Queue ID (STA*UP, Mcast, MC2UC, etc)*/
-#define TXRING_CTRL_TAG_SHIFT   26     /* Tags for special Processing         */
-#define TXRING_CTRL_TAG_MASK    0x3F   /* Tags for special Processing         */
+#define TXRING_CTRL_LEN_MASK    GENMASK(13, 0)  /* PCIe Payload size (Starts w/ SNAP) */
+#define TXRING_CTRL_QID_MASK    GENMASK(25, 14) /* Queue ID (STA*UP, Mcast, MC2UC, etc) */
+#define TXRING_CTRL_TAG_MASK    GENMASK(31, 26) /* Tags for special Processing */
 #define TXRING_CTRL_TAG_MGMT    0x01   /* Has Host generated dot11 Header     */
 #define TXRING_CTRL_TAG_EAP     0x02   /* Tag for EAPOL frames                */
 #define TXRING_CTRL_TAG_TCP_ACK 0x4
@@ -364,17 +353,13 @@ struct tx_ring_done {
 	__le32 user;
 } __packed;
 
-#define RXRING_CTRL_CASE_SHIFT  0     /* What is in the buffer(RXRING_CASE_*) */
-#define RXRING_CTRL_CASE_MASK   0x1F  /* What is in the buffer(RXRING_CASE_*) */
-#define RXRING_CTRL_STA_SHIFT   5     /* STA information (or Mcast group)     */
-#define RXRING_CTRL_STA_MASK    0x1FF /* STA information (or Mcast group)     */
+#define RXRING_CTRL_CASE_MASK   GENMASK(4, 0)   /* What is in the buffer(RXRING_CASE_*) */
+#define RXRING_CTRL_STA_MASK    GENMASK(13, 5)  /* STA information (or Mcast group) */
 #define RXRING_CTRL_STA_UNKNOWN 0x1FF /* STA Idx for packets from Unknown STA */
 #define RXRING_CTRL_STA_FROMDS  0x1FE /* STA Idx for packets from DS          */
-#define RXRING_CTRL_TID_SHIFT   14    /* TID/UP for QoS Data frames           */
-#define RXRING_CTRL_TID_MASK    0xF   /* TID/UP for QoS Data frames           */
-#define RXRING_CTRL_KEY_SHIFT   18    /* Key Type used (KEY_TYPE_*)           */
-#define RXRING_CTRL_KEY_MASK    0xF   /* Key Type used (KEY_TYPE_*)           */
-#define RXRING_CTRL_TRUNC       (1UL<<31) /* Packet Truncated                 */
+#define RXRING_CTRL_TID_MASK    GENMASK(17, 14) /* TID/UP for QoS Data frames */
+#define RXRING_CTRL_KEY_MASK    GENMASK(21, 18) /* Key Type used (KEY_TYPE_*) */
+#define RXRING_CTRL_TRUNC       BIT(31)         /* Packet Truncated                 */
 
 /* Rx Buffer Formats
  *    Each Case listed above will indicate the format used, and each format will
@@ -862,14 +847,10 @@ static inline void pcie_tx_prepare_info(struct mwl_priv *priv, u32 rate,
 
 	if (rate) {
 		/* Prepare rate information */
-		format = rate & MWL_TX_RATE_FORMAT_MASK;
-		bandwidth =
-			(rate & MWL_TX_RATE_BANDWIDTH_MASK) >>
-			MWL_TX_RATE_BANDWIDTH_SHIFT;
-		short_gi = (rate & MWL_TX_RATE_SHORTGI_MASK) >>
-			MWL_TX_RATE_SHORTGI_SHIFT;
-		rate_id = (rate & MWL_TX_RATE_RATEIDMCS_MASK) >>
-			MWL_TX_RATE_RATEIDMCS_SHIFT;
+		format = FIELD_GET(MWL_TX_RATE_FORMAT_MASK, rate);
+		bandwidth = FIELD_GET(MWL_TX_RATE_BANDWIDTH_MASK, rate);
+		short_gi = FIELD_GET(MWL_TX_RATE_SHORTGI_MASK, rate);
+		rate_id = FIELD_GET(MWL_TX_RATE_RATEIDMCS_MASK, rate);
 
 		info->status.rates[0].idx = rate_id;
 		if (format == TX_RATE_FORMAT_LEGACY) {

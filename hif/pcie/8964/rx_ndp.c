@@ -523,8 +523,8 @@ int pcie_rx_poll_ndp(struct napi_struct *napi, int budget)
 
 		bad_mic = false;
 		ctrl = le32_to_cpu(prx_ring_done->ctrl);
-		ctrl_case = ctrl & RXRING_CTRL_CASE_MASK;
-		stnid = (ctrl >> RXRING_CTRL_STA_SHIFT) & RXRING_CTRL_STA_MASK;
+		ctrl_case = FIELD_GET(RXRING_CTRL_CASE_MASK, ctrl);
+		stnid = FIELD_GET(RXRING_CTRL_STA_MASK, ctrl);
 		pcie_rx_update_ndp_cnts(priv, ctrl_case);
 
 		switch (ctrl_case) {

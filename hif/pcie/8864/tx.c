@@ -749,7 +749,7 @@ void pcie_8864_tx_xmit(struct ieee80211_hw *hw,
 			     MWL_ACTION_CODE(mgmt) ==
 			     WLAN_ACTION_ADDBA_REQ)) {
 			capab = le16_to_cpu(MWL_ADDBA_REQ(mgmt).capab);
-			tid = (capab & IEEE80211_ADDBA_PARAM_TID_MASK) >> 2;
+			tid = FIELD_GET(IEEE80211_ADDBA_PARAM_TID_MASK, capab);
 			if (tid < IEEE80211_FIRST_TSPEC_TSID)
 				index = utils_tid_to_ac(tid);
 		}

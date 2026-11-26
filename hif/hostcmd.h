@@ -20,6 +20,8 @@
 #ifndef _HOSTCMD_H_
 #define _HOSTCMD_H_
 
+#include <linux/bitfield.h>
+
 /* 16 bit host command code */
 #define HOSTCMD_CMD_GET_HW_SPEC                 0x0003
 #define HOSTCMD_CMD_SET_HW_SPEC                 0x0004
@@ -174,16 +176,11 @@
 
 #define HW_SET_PARMS_FEATURES_HOST_PROBE_RESP   0x00000020
 
-#define EDMAC_2G_ENABLE_MASK                    0x00000001
-#define EDMAC_2G_ENABLE_SHIFT                   0x0
-#define EDMAC_5G_ENABLE_MASK                    0x00000002
-#define EDMAC_5G_ENABLE_SHIFT                   0x1
-#define EDMAC_2G_THRESHOLD_OFFSET_MASK          0x00000FF0
-#define EDMAC_2G_THRESHOLD_OFFSET_SHIFT         0x4
-#define EDMAC_5G_THRESHOLD_OFFSET_MASK          0x000FF000
-#define EDMAC_5G_THRESHOLD_OFFSET_SHIFT         0xC
-#define EDMAC_QLOCK_BITMAP_MASK                 0x0FF00000
-#define EDMAC_QLOCK_BITMAP_SHIFT                0x14
+#define EDMAC_2G_ENABLE_MASK                    BIT(0)
+#define EDMAC_5G_ENABLE_MASK                    BIT(1)
+#define EDMAC_2G_THRESHOLD_OFFSET_MASK          GENMASK(11, 4)
+#define EDMAC_5G_THRESHOLD_OFFSET_MASK          GENMASK(19, 12)
+#define EDMAC_QLOCK_BITMAP_MASK                 GENMASK(27, 20)
 
 enum {
 	WL_DISABLE = 0,
@@ -424,11 +421,9 @@ struct hostcmd_cmd_set_cfg {
 } __packed;
 
 /* HOSTCMD_CMD_SET_RF_CHANNEL */
-#define FREQ_BAND_MASK     0x0000003f
-#define CHNL_WIDTH_MASK    0x000007c0
-#define CHNL_WIDTH_SHIFT   6
-#define ACT_PRIMARY_MASK   0x00003800
-#define ACT_PRIMARY_SHIFT  11
+#define FREQ_BAND_MASK     GENMASK(5, 0)
+#define CHNL_WIDTH_MASK    GENMASK(10, 6)
+#define ACT_PRIMARY_MASK   GENMASK(13, 11)
 
 struct hostcmd_cmd_set_rf_channel {
 	struct hostcmd_header cmd_hdr;
@@ -900,13 +895,11 @@ struct hostcmd_cmd_set_key {
 } __packed;
 
 /* HOSTCMD_CMD_BASTREAM */
-#define BA_TYPE_MASK           0x00000001
-#define BA_DIRECTION_MASK      0x0000000e
-#define BA_DIRECTION_SHIFT     1
+#define BA_TYPE_MASK           BIT(0)
+#define BA_DIRECTION_MASK      GENMASK(3, 1)
 
-#define BA_TYPE_MASK_NDP       0x00000003
-#define BA_DIRECTION_MASK_NDP  0x0000001c
-#define BA_DIRECTION_SHIFT_NDP 2
+#define BA_TYPE_MASK_NDP       GENMASK(1, 0)
+#define BA_DIRECTION_MASK_NDP  GENMASK(4, 2)
 
 struct ba_context {
 	__le32 context;
