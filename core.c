@@ -1060,16 +1060,13 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	}
 	hw->wiphy->n_iface_combinations = 1;
 
-	if (priv->antenna_tx == ANTENNA_TX_1) {
-		hw->wiphy->available_antennas_rx = 0x1;
-		hw->wiphy->available_antennas_tx = 0x1;
-	} else if (priv->antenna_tx == ANTENNA_TX_2) {
-		hw->wiphy->available_antennas_rx = 0x2;
-		hw->wiphy->available_antennas_tx = 0x2;
-	} else {
-		hw->wiphy->available_antennas_rx = 0x4;
-		hw->wiphy->available_antennas_tx = 0x4;
-	}
+	/* These are bitmaps of chains. antenna_tx already is one and
+	 * antenna_rx is a count; 0 means all four for both.
+	 */
+	hw->wiphy->available_antennas_tx =
+		priv->antenna_tx ? priv->antenna_tx : 0xf;
+	hw->wiphy->available_antennas_rx =
+		priv->antenna_rx ? GENMASK(priv->antenna_rx - 1, 0) : 0xf;
 
 	mwl_set_caps(priv);
 
