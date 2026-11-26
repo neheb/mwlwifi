@@ -570,12 +570,9 @@ static void mwl_set_ht_caps(struct mwl_priv *priv,
 	band->ht_cap.mcs.rx_mask[4] = 0x01;
 
 	band->ht_cap.mcs.tx_params = IEEE80211_HT_MCS_TX_DEFINED;
-	if (priv->antenna_tx == ANTENNA_TX_1)
-		band->ht_cap.mcs.rx_highest = cpu_to_le16(150);
-	if (priv->antenna_tx == ANTENNA_TX_2)
-		band->ht_cap.mcs.rx_highest = cpu_to_le16(300);
-	if (priv->antenna_tx == ANTENNA_TX_4_AUTO)
-		band->ht_cap.mcs.rx_highest = cpu_to_le16(450);
+	/* 150 Mb/s per stream at 40 MHz with a short guard interval */
+	band->ht_cap.mcs.rx_highest =
+		cpu_to_le16(150 * ant_rx_no[priv->antenna_rx]);
 }
 
 static void mwl_set_vht_caps(struct mwl_priv *priv,
