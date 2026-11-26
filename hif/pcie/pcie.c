@@ -27,9 +27,8 @@
 #include "hif/pcie/dev.h"
 #include "hif/pcie/fwdl.h"
 #include "hif/pcie/8864/tx.h"
-#include "hif/pcie/8864/rx.h"
 #include "hif/pcie/8997/tx.h"
-#include "hif/pcie/8997/rx.h"
+#include "hif/pcie/rx.h"
 #include "hif/pcie/8964/tx_ndp.h"
 #include "hif/pcie/8964/rx_ndp.h"
 
@@ -217,7 +216,7 @@ static int pcie_init_8997(struct ieee80211_hw *hw)
 	pcie_priv->napi_dev = alloc_netdev_dummy(0);
 	if (!pcie_priv->napi_dev)
 		return -ENOMEM;
-	netif_napi_add(pcie_priv->napi_dev, &pcie_priv->napi, pcie_8997_poll_napi);
+	netif_napi_add(pcie_priv->napi_dev, &pcie_priv->napi, pcie_rx_poll_napi);
 	pcie_priv->txq_limit = PCIE_TX_QUEUE_LIMIT;
 	pcie_priv->txq_wake_threshold = PCIE_TX_WAKE_Q_THRESHOLD;
 	pcie_priv->recv_limit = PCIE_RECEIVE_LIMIT;
@@ -229,7 +228,7 @@ static int pcie_init_8997(struct ieee80211_hw *hw)
 		goto err_mwl_tx_init;
 	}
 
-	rc = pcie_8997_rx_init(hw);
+	rc = pcie_rx_init(hw);
 	if (rc) {
 		wiphy_err(hw->wiphy, "%s: fail to initialize RX\n",
 			  PCIE_DRV_NAME);
@@ -282,7 +281,7 @@ static int pcie_init_8997(struct ieee80211_hw *hw)
 err_set_hw_specs:
 err_get_hw_specs:
 
-	pcie_8997_rx_deinit(hw);
+	pcie_rx_deinit(hw);
 
 err_mwl_rx_init:
 
@@ -316,7 +315,7 @@ static int pcie_init_8864(struct ieee80211_hw *hw)
 	pcie_priv->napi_dev = alloc_netdev_dummy(0);
 	if (!pcie_priv->napi_dev)
 		return -ENOMEM;
-	netif_napi_add(pcie_priv->napi_dev, &pcie_priv->napi, pcie_8864_poll_napi);
+	netif_napi_add(pcie_priv->napi_dev, &pcie_priv->napi, pcie_rx_poll_napi);
 	pcie_priv->txq_limit = PCIE_TX_QUEUE_LIMIT;
 	pcie_priv->txq_wake_threshold = PCIE_TX_WAKE_Q_THRESHOLD;
 	pcie_priv->recv_limit = PCIE_RECEIVE_LIMIT;
@@ -328,7 +327,7 @@ static int pcie_init_8864(struct ieee80211_hw *hw)
 		goto err_mwl_tx_init;
 	}
 
-	rc = pcie_8864_rx_init(hw);
+	rc = pcie_rx_init(hw);
 	if (rc) {
 		wiphy_err(hw->wiphy, "%s: fail to initialize RX\n", PCIE_DRV_NAME);
 		goto err_mwl_rx_init;
@@ -382,7 +381,7 @@ static int pcie_init_8864(struct ieee80211_hw *hw)
 err_set_hw_specs:
 err_get_hw_specs:
 
-	pcie_8864_rx_deinit(hw);
+	pcie_rx_deinit(hw);
 
 err_mwl_rx_init:
 
@@ -408,7 +407,7 @@ static void pcie_deinit_8997(struct ieee80211_hw *hw)
 	disable_work_sync(&pcie_priv->tx_done_work);
 	disable_work_sync(&pcie_priv->tx_work);
 
-	pcie_8997_rx_deinit(hw);
+	pcie_rx_deinit(hw);
 	pcie_8997_tx_deinit(hw);
 	netif_napi_del(&pcie_priv->napi);
 	free_netdev(pcie_priv->napi_dev);
@@ -425,7 +424,7 @@ static void pcie_deinit_8864(struct ieee80211_hw *hw)
 	disable_work_sync(&pcie_priv->tx_done_work);
 	disable_work_sync(&pcie_priv->tx_work);
 
-	pcie_8864_rx_deinit(hw);
+	pcie_rx_deinit(hw);
 	pcie_8864_tx_deinit(hw);
 	netif_napi_del(&pcie_priv->napi);
 	free_netdev(pcie_priv->napi_dev);
@@ -519,49 +518,8 @@ static int pcie_get_irq_num(struct ieee80211_hw *hw)
 	return pcie_priv->pdev->irq;
 }
 
-static irqreturn_t pcie_isr_8864(struct ieee80211_hw *hw)
-{
-	struct mwl_priv *priv = hw->priv;
-	struct pcie_priv *pcie_priv = priv->hif.priv;
-	u32 int_status;
-
-	int_status = readl(pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CAUSE);
-
-	if (int_status == 0x00000000)
-		return IRQ_NONE;
-
-	if (int_status == 0xffffffff) {
-		wiphy_warn(hw->wiphy, "card unplugged?\n");
-	} else {
-		writel(~int_status,
-		       pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CAUSE);
-
-		if (int_status & MACREG_A2HRIC_BIT_TX_DONE) {
-			priv->hif.ops->irq_disable(hw);
-			queue_work(system_bh_wq, &pcie_priv->tx_done_work);
-		}
-
-		if (int_status & MACREG_A2HRIC_BIT_RX_RDY) {
-			priv->hif.ops->irq_disable(hw);
-			napi_schedule(&pcie_priv->napi);
-		}
-
-		if (int_status & MACREG_A2HRIC_BIT_RADAR_DETECT) {
-			wiphy_info(hw->wiphy, "radar detected by firmware\n");
-			ieee80211_radar_detected(hw, NULL);
-		}
-
-		if (int_status & MACREG_A2HRIC_BIT_CHAN_SWITCH)
-			ieee80211_queue_work(hw, &priv->chnl_switch_handle);
-
-		if (int_status & MACREG_A2HRIC_BA_WATCHDOG)
-			ieee80211_queue_work(hw, &priv->watchdog_ba_handle);
-	}
-
-	return IRQ_HANDLED;
-}
-
-static irqreturn_t pcie_isr_8997(struct ieee80211_hw *hw)
+/* 88W8864 and 88W8997 */
+static irqreturn_t pcie_isr(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
@@ -731,7 +689,7 @@ static struct mwl_hif_ops pcie_hif_ops_8997 = {
 	.disable_data_tasks    = pcie_disable_data_tasks,
 	.exec_cmd              = pcie_exec_cmd,
 	.get_irq_num           = pcie_get_irq_num,
-	.irq_handler           = pcie_isr_8997,
+	.irq_handler           = pcie_isr,
 	.irq_enable            = pcie_irq_enable,
 	.irq_disable           = pcie_irq_disable,
 	.download_firmware     = pcie_download_firmware,
@@ -759,7 +717,7 @@ static struct mwl_hif_ops pcie_hif_ops_8864 = {
 	.disable_data_tasks    = pcie_disable_data_tasks,
 	.exec_cmd              = pcie_exec_cmd,
 	.get_irq_num           = pcie_get_irq_num,
-	.irq_handler           = pcie_isr_8864,
+	.irq_handler           = pcie_isr,
 	.irq_enable            = pcie_irq_enable,
 	.irq_disable           = pcie_irq_disable,
 	.download_firmware     = pcie_download_firmware,

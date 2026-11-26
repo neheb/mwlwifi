@@ -13,13 +13,13 @@
  * this warranty disclaimer.
  */
 
-/* Description:  This file defines receive related functions. */
+/* Description:  This file defines receive related functions of the 88W8864 and 88W8997. */
 
-#ifndef _8864_RX_H_
-#define _8864_RX_H_
+#ifndef _PCIE_RX_H_
+#define _PCIE_RX_H_
 
-int pcie_8864_rx_init(struct ieee80211_hw *hw);
-void pcie_8864_rx_deinit(struct ieee80211_hw *hw);
-int pcie_8864_poll_napi(struct napi_struct *napi, int budget);
+int pcie_rx_init(struct ieee80211_hw *hw);
+void pcie_rx_deinit(struct ieee80211_hw *hw);
+int pcie_rx_poll_napi(struct napi_struct *napi, int budget);
 
-#endif /* _8864_RX_H_ */
+#endif /* _PCIE_RX_H_ */

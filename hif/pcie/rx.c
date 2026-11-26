@@ -22,7 +22,7 @@
 #include "core.h"
 #include "utils.h"
 #include "hif/pcie/dev.h"
-#include "hif/pcie/8864/rx.h"
+#include "hif/pcie/rx.h"
 
 #define MAX_NUM_RX_RING_BYTES  (PCIE_MAX_NUM_RX_DESC * \
 				sizeof(struct pcie_rx_desc))
@@ -191,7 +191,13 @@ static inline void pcie_rx_status(struct mwl_priv *priv,
 
 	memset(status, 0, sizeof(*status));
 
-	status->signal = -(pdesc->rssi + W836X_RSSI_OFFSET);
+	/* The 88W8997 reports a signed dBm value, the 88W8864 a positive
+	 * one below an offset.
+	 */
+	if (priv->chip_type == MWL8997)
+		status->signal = (s8)pdesc->rssi;
+	else
+		status->signal = -(pdesc->rssi + W836X_RSSI_OFFSET);
 
 	rx_rate = le16_to_cpu(pdesc->rate);
 	pcie_rx_prepare_status(priv,
@@ -288,7 +294,7 @@ static inline void pcie_rx_process_amsdu(struct mwl_priv *priv,
 	}
 }
 
-int pcie_8864_rx_init(struct ieee80211_hw *hw)
+int pcie_rx_init(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
 	int rc;
@@ -310,7 +316,7 @@ int pcie_8864_rx_init(struct ieee80211_hw *hw)
 	return 0;
 }
 
-void pcie_8864_rx_deinit(struct ieee80211_hw *hw)
+void pcie_rx_deinit(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
 
@@ -318,7 +324,7 @@ void pcie_8864_rx_deinit(struct ieee80211_hw *hw)
 	pcie_rx_ring_free(priv);
 }
 
-int pcie_8864_poll_napi(struct napi_struct *napi, int budget)
+int pcie_rx_poll_napi(struct napi_struct *napi, int budget)
 {
 	struct pcie_priv *pcie_priv = container_of(napi, struct pcie_priv, napi);
 	struct mwl_priv *priv = pcie_priv->mwl_priv;
@@ -387,7 +393,13 @@ int pcie_8864_poll_napi(struct napi_struct *napi, int budget)
 		status = IEEE80211_SKB_RXCB(prx_skb);
 		pcie_rx_status(priv, curr_hndl->pdesc, status);
 
-		priv->noise = -curr_hndl->pdesc->noise_floor;
+		if (priv->chip_type == MWL8997) {
+			priv->noise = (s8)curr_hndl->pdesc->noise_floor;
+			if (priv->noise > 0)
+				priv->noise = -priv->noise;
+		} else {
+			priv->noise = -curr_hndl->pdesc->noise_floor;
+		}
 
 		wh = &((struct pcie_dma_data *)prx_skb->data)->wh;
 
@@ -414,10 +426,11 @@ int pcie_8864_poll_napi(struct napi_struct *napi, int budget)
 				pkt_len += 4;
 			}
 
-			status->flag |=
-				RX_FLAG_IV_STRIPPED |
-				RX_FLAG_DECRYPTED |
-				RX_FLAG_MMIC_STRIPPED;
+			/* The 88W8997 leaves the IV in the frame. */
+			status->flag |= RX_FLAG_DECRYPTED |
+					RX_FLAG_MMIC_STRIPPED;
+			if (priv->chip_type != MWL8997)
+				status->flag |= RX_FLAG_IV_STRIPPED;
 		}
 
 		skb_put(prx_skb, pkt_len);

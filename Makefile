@@ -9,9 +9,8 @@ mwlwifi-objs			+= hif/fwcmd.o
 mwlwifi-objs			+= hif/pcie/pcie.o
 mwlwifi-objs			+= hif/pcie/fwdl.o
 mwlwifi-objs			+= hif/pcie/8864/tx.o
-mwlwifi-objs			+= hif/pcie/8864/rx.o
+mwlwifi-objs			+= hif/pcie/rx.o
 mwlwifi-objs			+= hif/pcie/8997/tx.o
-mwlwifi-objs			+= hif/pcie/8997/rx.o
 mwlwifi-objs			+= hif/pcie/8964/tx_ndp.o
 mwlwifi-objs			+= hif/pcie/8964/rx_ndp.o
 
