@@ -492,6 +492,11 @@ static bool pcie_tx_pull_ndp(struct ieee80211_hw *hw, int num,
 
 	ieee80211_txq_schedule_start(hw, ac);
 	while (room && (txq = ieee80211_next_txq(hw, ac))) {
+		/* mac80211 requires RCU to be held from dequeueing a frame
+		 * until the driver is done with it: tx_info->control.hw_key
+		 * may be freed once it is dropped.
+		 */
+		rcu_read_lock();
 		while ((room = pcie_tx_room_ndp(hw, inflight_max)) &&
 		       (skb = ieee80211_tx_dequeue(hw, txq))) {
 			qnum = pcie_tx_prepare_ndp(hw, txq->sta, skb);
@@ -501,6 +506,7 @@ static bool pcie_tx_pull_ndp(struct ieee80211_hw *hw, int num,
 			if (!room)
 				break;
 		}
+		rcu_read_unlock();
 		ieee80211_return_txq(hw, txq, false);
 	}
 	ieee80211_txq_schedule_end(hw, ac);
