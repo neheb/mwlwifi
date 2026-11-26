@@ -183,6 +183,7 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 	struct mwl_vif *mwl_vif;
 	u32 macids_supported;
 	int macid;
+	int rc;
 
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
@@ -221,25 +222,43 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 	mwl_vif->basic_rate_idx = 0;
 	mwl_vif->broadcast_ssid = 0xFF;
 
+	/* The commands fail only if the firmware doesn't answer. Don't
+	 * bring up an interface it doesn't know about.
+	 */
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
 		ether_addr_copy(mwl_vif->bssid, vif->addr);
-		mwl_fwcmd_set_new_stn_add_self(hw, vif);
+		rc = mwl_fwcmd_set_new_stn_add_self(hw, vif);
+		if (rc)
+			return rc;
 		if (priv->chip_type == MWL8964) {
 			/* allow firmware to really set channel */
-			mwl_fwcmd_bss_start(hw, vif, true);
-			mwl_fwcmd_bss_start(hw, vif, false);
+			rc = mwl_fwcmd_bss_start(hw, vif, true);
+			if (!rc)
+				rc = mwl_fwcmd_bss_start(hw, vif, false);
+			if (rc) {
+				mwl_fwcmd_set_new_stn_del(hw, vif, vif->addr);
+				return rc;
+			}
 		}
 		break;
 	case NL80211_IFTYPE_MESH_POINT:
 		ether_addr_copy(mwl_vif->bssid, vif->addr);
-		mwl_fwcmd_set_new_stn_add_self(hw, vif);
+		rc = mwl_fwcmd_set_new_stn_add_self(hw, vif);
+		if (rc)
+			return rc;
 		break;
 	case NL80211_IFTYPE_STATION:
 		ether_addr_copy(mwl_vif->sta_mac, vif->addr);
-		mwl_fwcmd_bss_start(hw, vif, true);
-		mwl_fwcmd_set_infra_mode(hw, vif);
-		mwl_fwcmd_set_mac_addr_client(hw, vif, vif->addr);
+		rc = mwl_fwcmd_bss_start(hw, vif, true);
+		if (!rc)
+			rc = mwl_fwcmd_set_infra_mode(hw, vif);
+		if (!rc)
+			rc = mwl_fwcmd_set_mac_addr_client(hw, vif, vif->addr);
+		if (rc) {
+			mwl_fwcmd_remove_mac_addr(hw, vif, vif->addr);
+			return rc;
+		}
 		break;
 	default:
 		return -EINVAL;
