@@ -781,6 +781,10 @@ static void mwl_mac80211_sta_remove(struct ieee80211_hw *hw,
 			   sta->addr);
 
 	mwl_hif_set_sta_id(hw, sta, sta_info->link_sta_mode, false);
+	/* mac80211 frees the station once this returns, without waiting
+	 * for the RX path that may still have it.
+	 */
+	synchronize_net();
 
 	if (priv->chip_type != MWL8964)
 		utils_free_stnid(priv, sta_info->stnid);

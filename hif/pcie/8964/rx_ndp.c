@@ -219,14 +219,18 @@ static inline void pcie_rx_process_fast_data(struct mwl_priv *priv,
 	if (stnid > SYSADPT_MAX_STA_SC4)
 		goto drop_packet;
 
-	sta = pcie_priv->sta_link[stnid];
+	/* mac80211 frees the station right after removing it from the
+	 * driver, which waits for this section to end.
+	 */
+	rcu_read_lock();
+	sta = rcu_dereference(pcie_priv->sta_link[stnid]);
 	if (!sta)
-		goto drop_packet;
+		goto drop_packet_unlock;
 
 	sta_info = mwl_dev_get_sta(sta);
 	mwl_vif = sta_info->mwl_vif;
 	if (!mwl_vif)
-		goto drop_packet;
+		goto drop_packet_unlock;
 
 	ethertype = (skb->data[20] << 8) | skb->data[21];
 	fc = cpu_to_le16(IEEE80211_FTYPE_DATA | IEEE80211_STYPE_DATA);
@@ -272,7 +276,7 @@ static inline void pcie_rx_process_fast_data(struct mwl_priv *priv,
 		}
 		break;
 	default:
-		goto drop_packet;
+		goto drop_packet_unlock;
 	}
 
 	if (sta->wme) {
@@ -307,11 +311,14 @@ static inline void pcie_rx_process_fast_data(struct mwl_priv *priv,
 				IEEE80211_QOS_CTL_ACK_POLICY_NOACK);
 	} else
 		memcpy(skb_push(skb, hdrlen), &hdr, hdrlen);
+	rcu_read_unlock();
 
 	status->flag |= RX_FLAG_DUP_VALIDATED;
 	ieee80211_rx_napi(priv->hw, NULL, skb, &pcie_priv->napi);
 
 	return;
+drop_packet_unlock:
+	rcu_read_unlock();
 drop_packet:
 
 	dev_kfree_skb_any(skb);

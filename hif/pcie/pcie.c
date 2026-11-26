@@ -1028,7 +1028,7 @@ static void pcie_set_sta_id(struct ieee80211_hw *hw,
 
 	sta_info = mwl_dev_get_sta(sta);
 	stnid = sta_mode ? 0 : sta_info->stnid;
-	pcie_priv->sta_link[stnid] = set ? sta : NULL;
+	rcu_assign_pointer(pcie_priv->sta_link[stnid], set ? sta : NULL);
 }
 
 static void pcie_tx_account(struct mwl_priv *priv,

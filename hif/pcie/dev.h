@@ -619,7 +619,8 @@ struct pcie_priv {
 	 */
 	struct hrtimer tx_poll_timer;
 	u32 tx_poll_us;
-	struct ieee80211_sta *sta_link[SYSADPT_MAX_STA_SC4 + 1];
+	/* Read by the 88W8964 RX path under RCU. */
+	struct ieee80211_sta __rcu *sta_link[SYSADPT_MAX_STA_SC4 + 1];
 	struct ndp_rx_counter rx_cnts;
 	u32 recheck_rxringdone;
 	u32 acnt_busy;
