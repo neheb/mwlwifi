@@ -465,15 +465,19 @@ void pcie_tx_skbs_ndp(struct work_struct *work)
 	struct ieee80211_hw *hw = priv->hw;
 	int num = SYSADPT_TX_WMM_QUEUES;
 	struct sk_buff *tx_skb;
+	u32 inflight_max;
 	int rc;
+
+	inflight_max = clamp_t(u32, pcie_priv->tx_inflight_max, 1,
+			       MAX_TX_RING_SEND_SIZE - 1);
 
 	while (num--) {
 		while (skb_queue_len(&pcie_priv->txq[num]) > 0) {
 			if (pcie_priv->desc_data_ndp.tx_desc_busy_cnt >=
-			    (MAX_TX_RING_SEND_SIZE - 1)) {
+			    inflight_max) {
 				pcie_tx_done_ndp(hw);
 				if (pcie_priv->desc_data_ndp.tx_desc_busy_cnt >=
-				    (MAX_TX_RING_SEND_SIZE - 1))
+				    inflight_max)
 					break;
 			}
 

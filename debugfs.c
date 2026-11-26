@@ -1783,6 +1783,19 @@ void mwl_debugfs_init(struct ieee80211_hw *hw)
 		return;
 
 	MWLWIFI_DEBUGFS_ADD_FILE(info);
+	if (priv->chip_type == MWL8964) {
+		struct pcie_priv *pcie_priv = priv->hif.priv;
+
+		debugfs_create_u32("tx_inflight_max", 0600, priv->debugfs_phy,
+				   &pcie_priv->tx_inflight_max);
+		debugfs_create_u32("txq_limit", 0600, priv->debugfs_phy,
+				   &pcie_priv->txq_limit);
+		debugfs_create_u32("txq_wake_threshold", 0600,
+				   priv->debugfs_phy,
+				   &pcie_priv->txq_wake_threshold);
+		debugfs_create_u32("tx_poll_us", 0600, priv->debugfs_phy,
+				   &pcie_priv->tx_poll_us);
+	}
 	MWLWIFI_DEBUGFS_ADD_FILE(tx_status);
 	MWLWIFI_DEBUGFS_ADD_FILE(rx_decrypt);
 	MWLWIFI_DEBUGFS_ADD_FILE(rx_status);

@@ -433,7 +433,7 @@ static int pcie_get_info(struct ieee80211_hw *hw, char *buf, size_t size)
 	len += scnprintf(p + len, size - len, "iobase1: %p\n",
 			 pcie_priv->iobase1);
 	len += scnprintf(p + len, size - len,
-			 "tx limit: %d\n", pcie_priv->txq_limit);
+			 "tx limit: %u\n", pcie_priv->txq_limit);
 	len += scnprintf(p + len, size - len,
 			 "rx limit: %d\n", pcie_priv->recv_limit);
 	return len;
@@ -797,6 +797,7 @@ static int pcie_init_ndp(struct ieee80211_hw *hw)
 	netif_napi_add(pcie_priv->napi_dev, &pcie_priv->napi, pcie_rx_poll_ndp);
 	pcie_priv->txq_limit = TX_QUEUE_LIMIT;
 	pcie_priv->txq_wake_threshold = TX_WAKE_Q_THRESHOLD;
+	pcie_priv->tx_inflight_max = TX_INFLIGHT_MAX;
 
 	rc = pcie_tx_init_ndp(hw);
 	if (rc) {
@@ -895,7 +896,7 @@ static int pcie_get_info_ndp(struct ieee80211_hw *hw, char *buf, size_t size)
 	len += scnprintf(p + len, size - len, "iobase1: %p\n",
 			 pcie_priv->iobase1);
 	len += scnprintf(p + len, size - len,
-			 "tx limit: %d\n", pcie_priv->txq_limit);
+			 "tx limit: %u\n", pcie_priv->txq_limit);
 	return len;
 }
 
@@ -911,6 +912,11 @@ static int pcie_get_tx_status_ndp(struct ieee80211_hw *hw, char *buf,
 			 pcie_priv->tx_done_cnt);
 	len += scnprintf(p + len, size - len, "tx_desc_busy_cnt: %d\n",
 			 pcie_priv->desc_data_ndp.tx_desc_busy_cnt);
+	len += scnprintf(p + len, size - len, "txq_len: %u %u %u %u\n",
+			 skb_queue_len(&pcie_priv->txq[0]),
+			 skb_queue_len(&pcie_priv->txq[1]),
+			 skb_queue_len(&pcie_priv->txq[2]),
+			 skb_queue_len(&pcie_priv->txq[3]));
 	len += scnprintf(p + len, size - len, "tx_sent_head: %d\n",
 			 pcie_priv->desc_data_ndp.tx_sent_head);
 	len += scnprintf(p + len, size - len, "tx_sent_tail: %d\n",
