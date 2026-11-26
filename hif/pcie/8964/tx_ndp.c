@@ -433,64 +433,125 @@ void pcie_tx_deinit_ndp(struct ieee80211_hw *hw)
 	pcie_tx_ring_free_ndp(priv);
 }
 
+static int pcie_tx_prepare_ndp(struct ieee80211_hw *hw,
+			       struct ieee80211_sta *sta, struct sk_buff *skb);
+
+/* Whether the firmware may take another frame, after reaping the TX done
+ * ring if it has as many as it may.
+ */
+static bool pcie_tx_room_ndp(struct ieee80211_hw *hw, u32 inflight_max)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+
+	if (pcie_priv->desc_data_ndp.tx_desc_busy_cnt < inflight_max)
+		return true;
+	pcie_tx_done_ndp(hw);
+	return pcie_priv->desc_data_ndp.tx_desc_busy_cnt < inflight_max;
+}
+
+/* Hand a prepared frame to the firmware. Returns false if the ring took
+ * no more: the frame is then back at the head of the driver queue q, or
+ * dropped.
+ */
+static bool pcie_tx_send_ndp(struct ieee80211_hw *hw,
+			     struct sk_buff_head *q, struct sk_buff *skb)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	int rc;
+
+	rc = pcie_tx_skb_ndp(priv, skb);
+	if (rc) {
+		pcie_tx_done_ndp(hw);
+		if (rc == -EAGAIN)
+			skb_queue_head(q, skb);
+		return false;
+	}
+
+	if (++pcie_priv->tx_done_cnt > TXDONE_THRESHOLD) {
+		pcie_tx_done_ndp(hw);
+		pcie_priv->tx_done_cnt = 0;
+	}
+	return true;
+}
+
+/* Pull frames from mac80211's TXQs of an AC, one station after the other.
+ * Returns false if the firmware took no more.
+ */
+static bool pcie_tx_pull_ndp(struct ieee80211_hw *hw, int num,
+			     u32 inflight_max)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	int ac = SYSADPT_TX_WMM_QUEUES - num - 1;
+	struct ieee80211_txq *txq;
+	struct sk_buff *skb;
+	bool room = true;
+	int qnum;
+
+	ieee80211_txq_schedule_start(hw, ac);
+	while (room && (txq = ieee80211_next_txq(hw, ac))) {
+		while ((room = pcie_tx_room_ndp(hw, inflight_max)) &&
+		       (skb = ieee80211_tx_dequeue(hw, txq))) {
+			qnum = pcie_tx_prepare_ndp(hw, txq->sta, skb);
+			if (qnum < 0)
+				continue;
+			room = pcie_tx_send_ndp(hw, &pcie_priv->txq[qnum], skb);
+			if (!room)
+				break;
+		}
+		ieee80211_return_txq(hw, txq, false);
+	}
+	ieee80211_txq_schedule_end(hw, ac);
+
+	return room;
+}
+
+/* Hand frames to the firmware while fewer than tx_inflight_max are in
+ * flight, for each AC from VO to BK: first those in the driver queue,
+ * which mac80211 handed over directly, then those in its TXQs.
+ */
 void pcie_tx_skbs_ndp(struct work_struct *work)
 {
 	struct pcie_priv *pcie_priv = from_work(pcie_priv, work, tx_work);
 	struct mwl_priv *priv = pcie_priv->mwl_priv;
 	struct ieee80211_hw *hw = priv->hw;
 	int num = SYSADPT_TX_WMM_QUEUES;
-	struct sk_buff *tx_skb;
+	struct sk_buff *skb;
 	u32 inflight_max;
-	int rc;
+	bool room = true;
 
 	inflight_max = clamp_t(u32, pcie_priv->tx_inflight_max, 1,
 			       MAX_TX_RING_SEND_SIZE - 1);
 
-	while (num--) {
-		while (skb_queue_len(&pcie_priv->txq[num]) > 0) {
-			if (pcie_priv->desc_data_ndp.tx_desc_busy_cnt >=
-			    inflight_max) {
-				pcie_tx_done_ndp(hw);
-				if (pcie_priv->desc_data_ndp.tx_desc_busy_cnt >=
-				    inflight_max)
-					break;
-			}
-
-			tx_skb = skb_dequeue(&pcie_priv->txq[num]);
-
-			rc = pcie_tx_skb_ndp(priv, tx_skb);
-			if (rc) {
-				pcie_tx_done_ndp(hw);
-				if (rc == -EAGAIN)
-					skb_queue_head(&pcie_priv->txq[num],
-						       tx_skb);
+	while (room && num--) {
+		while ((room = pcie_tx_room_ndp(hw, inflight_max)) &&
+		       (skb = skb_dequeue(&pcie_priv->txq[num]))) {
+			room = pcie_tx_send_ndp(hw, &pcie_priv->txq[num], skb);
+			if (!room)
 				break;
-			}
-
-			if (++pcie_priv->tx_done_cnt > TXDONE_THRESHOLD) {
-				pcie_tx_done_ndp(hw);
-				pcie_priv->tx_done_cnt = 0;
-			}
 		}
 
-		if (pcie_priv->desc_data_ndp.tx_desc_busy_cnt)
-			pcie_arm_tx_poll(pcie_priv);
-
-		if (skb_queue_len(&pcie_priv->txq[num]) <
-		    pcie_priv->txq_wake_threshold) {
-			int queue;
-
-			queue = SYSADPT_TX_WMM_QUEUES - num - 1;
-			if (ieee80211_queue_stopped(hw, queue))
-				ieee80211_wake_queue(hw, queue);
-		}
+		if (room && priv->radio_on)
+			room = pcie_tx_pull_ndp(hw, num, inflight_max);
 	}
+
+	/* Look again once the firmware has room: mac80211 doesn't call
+	 * wake_tx_queue for frames it already told the driver about.
+	 */
+	WRITE_ONCE(pcie_priv->tx_txq_waiting, !room);
+
+	if (pcie_priv->desc_data_ndp.tx_desc_busy_cnt)
+		pcie_arm_tx_poll(pcie_priv);
 }
 
 bool pcie_tx_pending_ndp(struct pcie_priv *pcie_priv)
 {
 	int num;
 
+	if (READ_ONCE(pcie_priv->tx_txq_waiting))
+		return true;
 	for (num = 0; num < SYSADPT_TX_WMM_QUEUES; num++)
 		if (skb_queue_len(&pcie_priv->txq[num]))
 			return true;
@@ -544,17 +605,17 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 	desc->tx_done_tail = tx_done_tail;
 }
 
-void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
-		      struct ieee80211_tx_control *control,
-		      struct sk_buff *skb)
+/* Fill in the driver data of a frame for pcie_tx_skb_ndp(), and return
+ * the driver queue it belongs to, or -1 if the frame was dropped.
+ */
+static int pcie_tx_prepare_ndp(struct ieee80211_hw *hw,
+			       struct ieee80211_sta *sta, struct sk_buff *skb)
 {
 	struct mwl_priv *priv = hw->priv;
-	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct ieee80211_tx_info *tx_info;
 	struct ieee80211_key_conf *k_conf;
 	struct mwl_vif *mwl_vif;
 	int index;
-	struct ieee80211_sta *sta;
 	struct mwl_sta *sta_info;
 	struct ieee80211_hdr *wh;
 	u8 *da;
@@ -575,7 +636,6 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 	mwl_vif = tx_info->control.vif ?
 		  mwl_dev_get_vif(tx_info->control.vif) : NULL;
 	index = skb_get_queue_mapping(skb);
-	sta = control->sta;
 	sta_info = sta ? mwl_dev_get_sta(sta) : NULL;
 
 	wh = (struct ieee80211_hdr *)skb->data;
@@ -601,7 +661,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 	 */
 	if (!mwl_vif && !mgmtframe) {
 		ieee80211_free_txskb(hw, skb);
-		return;
+		return -1;
 	}
 
 	if (mgmtframe) {
@@ -671,7 +731,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 
 		if (pcie_tx_encapsulate_frame(priv, skb, k_conf)) {
 			ieee80211_free_txskb(hw, skb);
-			return;
+			return -1;
 		}
 		if (k_conf &&
 		    (k_conf->cipher == WLAN_CIPHER_SUITE_CCMP ||
@@ -692,7 +752,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 					   "can't send packet during ADDBA\n");
 				spin_unlock_bh(&priv->stream_lock);
 				ieee80211_free_txskb(hw, skb);
-				return;
+				return -1;
 			}
 			if ((stream->state == AMPDU_NO_STREAM) &&
 			    mwl_fwcmd_ampdu_allowed(sta, tid)) {
@@ -743,7 +803,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 		if (skb_tailroom(skb) < mic_room &&
 		    pskb_expand_head(skb, 0, mic_room, GFP_ATOMIC)) {
 			ieee80211_free_txskb(hw, skb);
-			return;
+			return -1;
 		}
 		skb_put_zero(skb, mic_room);
 		wh = &((struct pcie_dma_data *)skb->data)->wh;
@@ -771,13 +831,6 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 	tx_ctrl->rate = sta ? sta_info->tx_rate_info : 0;
 	pcie_tx_check_tcp_ack(skb, tx_ctrl);
 
-	if (skb_queue_len(&pcie_priv->txq[index]) > pcie_priv->txq_limit)
-		ieee80211_stop_queue(hw, SYSADPT_TX_WMM_QUEUES - index - 1);
-
-	skb_queue_tail(&pcie_priv->txq[index], skb);
-
-	pcie_schedule_tx(pcie_priv);
-
 	/* Initiate the ampdu session here */
 	if (start_ba_session) {
 		scoped_guard(spinlock_bh, &priv->stream_lock) {
@@ -788,4 +841,33 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 			stream->desc_num = index;
 		}
 	}
+
+	return index;
+}
+
+/* Frames mac80211 hands over directly instead of through a TXQ, such as
+ * management frames. They go out before the TXQs of their AC.
+ */
+void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
+		      struct ieee80211_tx_control *control,
+		      struct sk_buff *skb)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	int num;
+
+	num = pcie_tx_prepare_ndp(hw, control->sta, skb);
+	if (num < 0)
+		return;
+
+	skb_queue_tail(&pcie_priv->txq[num], skb);
+	pcie_schedule_tx(pcie_priv);
+}
+
+void pcie_wake_tx_queue_ndp(struct ieee80211_hw *hw,
+			    struct ieee80211_txq *txq)
+{
+	struct mwl_priv *priv = hw->priv;
+
+	pcie_schedule_tx(priv->hif.priv);
 }

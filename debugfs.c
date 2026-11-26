@@ -1343,11 +1343,6 @@ void mwl_debugfs_init(struct ieee80211_hw *hw)
 
 		debugfs_create_u32("tx_inflight_max", 0600, priv->debugfs_phy,
 				   &pcie_priv->tx_inflight_max);
-		debugfs_create_u32("txq_limit", 0600, priv->debugfs_phy,
-				   &pcie_priv->txq_limit);
-		debugfs_create_u32("txq_wake_threshold", 0600,
-				   priv->debugfs_phy,
-				   &pcie_priv->txq_wake_threshold);
 		debugfs_create_u32("tx_poll_us", 0600, priv->debugfs_phy,
 				   &pcie_priv->tx_poll_us);
 	}

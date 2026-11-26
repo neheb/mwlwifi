@@ -224,6 +224,20 @@ static inline void mwl_hif_tx_del_sta_amsdu_pkts(struct ieee80211_hw *hw,
 		priv->hif.ops->tx_del_sta_amsdu_pkts(hw, sta);
 }
 
+/* Without its own wake_tx_queue, a chip gets its frames through the .tx
+ * op, from mac80211's TXQs.
+ */
+static inline void mwl_hif_wake_tx_queue(struct ieee80211_hw *hw,
+					 struct ieee80211_txq *txq)
+{
+	struct mwl_priv *priv = hw->priv;
+
+	if (priv->hif.ops->wake_tx_queue)
+		priv->hif.ops->wake_tx_queue(hw, txq);
+	else
+		ieee80211_handle_wake_tx_queue(hw, txq);
+}
+
 static inline void mwl_hif_tx_return_pkts(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;

@@ -743,8 +743,6 @@ static int pcie_init_ndp(struct ieee80211_hw *hw)
 	if (!pcie_priv->napi_dev)
 		return -ENOMEM;
 	netif_napi_add(pcie_priv->napi_dev, &pcie_priv->napi, pcie_rx_poll_ndp);
-	pcie_priv->txq_limit = TX_QUEUE_LIMIT;
-	pcie_priv->txq_wake_threshold = TX_WAKE_Q_THRESHOLD;
 	pcie_priv->tx_inflight_max = TX_INFLIGHT_MAX;
 
 	rc = pcie_tx_init_ndp(hw);
@@ -841,7 +839,7 @@ static void pcie_get_info_ndp(struct ieee80211_hw *hw, struct seq_file *s)
 		   pcie_priv->iobase0);
 	seq_printf(s, "iobase1: %p\n",
 		   pcie_priv->iobase1);
-	seq_printf(s, "tx limit: %u\n", pcie_priv->txq_limit);
+	seq_printf(s, "tx inflight max: %u\n", pcie_priv->tx_inflight_max);
 }
 
 static void pcie_get_tx_status_ndp(struct ieee80211_hw *hw, struct seq_file *s)
@@ -1565,6 +1563,7 @@ static const struct mwl_hif_ops pcie_hif_ops_ndp = {
 	.timer_routine         = pcie_timer_routine_ndp,
 	.tx_xmit               = pcie_tx_xmit_ndp,
 	.tx_return_pkts        = pcie_tx_return_pkts_ndp,
+	.wake_tx_queue         = pcie_wake_tx_queue_ndp,
 	.get_device_node       = pcie_get_device_node,
 	.get_survey            = pcie_get_survey,
 	.set_sta_id            = pcie_set_sta_id,

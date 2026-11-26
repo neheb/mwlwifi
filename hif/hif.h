@@ -70,6 +70,8 @@ struct mwl_hif_ops {
 	void (*tx_del_sta_amsdu_pkts)(struct ieee80211_hw *hw,
 				      struct ieee80211_sta *sta);
 	void (*tx_return_pkts)(struct ieee80211_hw *hw);
+	void (*wake_tx_queue)(struct ieee80211_hw *hw,
+			      struct ieee80211_txq *txq);
 	struct device_node *(*get_device_node)(struct ieee80211_hw *hw);
 	void (*get_survey)(struct ieee80211_hw *hw,
 			   struct mwl_survey_info *survey_info);

@@ -277,15 +277,13 @@ struct pcie_dma_data {
 #define MAX_AGGR_SIZE          SKB_MAX_ORDER(RX_HEADROOM_NDP, 0)
 /* The firmware keeps its own queue per station and TID, behind the send
  * ring, so what it holds adds to the latency under load. Keep it to what
- * full throughput needs, and the driver's per-AC queues short, so that
- * the backlog stays in mac80211's queues (fq_codel). Measured on a
- * WRT3200ACM: 256 frames in flight keep 400 Mbit/s and cut the ping
- * during a TCP download from 15 to 10 ms; 128 cut it to 5 ms, at 5-15%
- * less UDP throughput. All four are tunable in debugfs.
+ * full throughput needs, so that the backlog stays in mac80211's TXQs
+ * (fq_codel). Measured on a WRT3200ACM: 256 frames in flight keep
+ * 400 Mbit/s and cut the ping during a TCP download from 15 to 10 ms;
+ * 128 cut it to 5 ms, at 5-15% less UDP throughput. Both this and the
+ * poll interval are tunable in debugfs.
  */
 #define TX_INFLIGHT_MAX        256
-#define TX_QUEUE_LIMIT         16
-#define TX_WAKE_Q_THRESHOLD    8
 #define TX_POLL_US             1000 /* TX done ring poll while busy */
 
 /* RateCode usage notes:
@@ -600,6 +598,8 @@ struct pcie_priv {
 	u32 txq_limit;
 	u32 txq_wake_threshold;
 	u32 tx_inflight_max;   /* 88W8964: frames handed to the firmware */
+	/* 88W8964: mac80211 may have frames the firmware had no room for */
+	bool tx_txq_waiting;
 	bool is_tx_done_schedule;
 	int recv_limit;
 
