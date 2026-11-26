@@ -349,6 +349,12 @@ struct mwl_priv {
 
 	bool debug_ampdu;
 	bool rx_decrypt;
+
+	/* The HIF private data is tail-allocated right after mwl_priv in the
+	 * same ieee80211_alloc_hw() block. This marker lets HIF callbacks
+	 * recover mwl_priv from their private pointer with container_of().
+	 */
+	u8 hif_data[] ____cacheline_aligned_in_smp;
 };
 
 #define MWL_CMD_BUF_SIZE 0x4000

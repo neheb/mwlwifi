@@ -528,7 +528,7 @@ void pcie_8864_tx_deinit(struct ieee80211_hw *hw)
 void pcie_8864_tx_skbs(struct work_struct *work)
 {
 	struct pcie_priv *pcie_priv = from_work(pcie_priv, work, tx_work);
-	struct mwl_priv *priv = pcie_priv->mwl_priv;
+	struct mwl_priv *priv = pcie_mwl_priv(pcie_priv);
 	struct ieee80211_hw *hw = priv->hw;
 	int num = SYSADPT_TX_WMM_QUEUES;
 	struct sk_buff *tx_skb;
@@ -599,7 +599,7 @@ void pcie_8864_tx_skbs(struct work_struct *work)
 void pcie_8864_tx_done_task(struct work_struct *work)
 {
 	struct pcie_priv *pcie_priv = from_work(pcie_priv, work, tx_done_work);
-	struct mwl_priv *priv = pcie_priv->mwl_priv;
+	struct mwl_priv *priv = pcie_mwl_priv(pcie_priv);
 	struct ieee80211_hw *hw = priv->hw;
 
 	pcie_non_pfu_tx_done(priv);

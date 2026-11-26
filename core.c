@@ -1142,7 +1142,7 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 	struct mwl_priv *priv;
 	int priv_size;
 
-	priv_size = ALIGN(sizeof(*priv), NETDEV_ALIGN) + hif_data_len;
+	priv_size = struct_size(priv, hif_data, hif_data_len);
 
 	hw = ieee80211_alloc_hw(priv_size, &mwl_mac80211_ops);
 	if (!hw)
@@ -1162,7 +1162,7 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 	priv->tx_amsdu = true;
 	priv->hif.bus = bus_type;
 	priv->hif.ops = ops;
-	priv->hif.priv = (char *)priv + ALIGN(sizeof(*priv), NETDEV_ALIGN);
+	priv->hif.priv = priv->hif_data;
 	priv->debug_ampdu = false;
 	priv->rx_decrypt = false;
 	priv->ampdu_num = mwl_hif_get_ampdu_num(hw);

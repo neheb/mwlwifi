@@ -327,7 +327,7 @@ void pcie_rx_deinit(struct ieee80211_hw *hw)
 int pcie_rx_poll_napi(struct napi_struct *napi, int budget)
 {
 	struct pcie_priv *pcie_priv = container_of(napi, struct pcie_priv, napi);
-	struct mwl_priv *priv = pcie_priv->mwl_priv;
+	struct mwl_priv *priv = pcie_mwl_priv(pcie_priv);
 	struct ieee80211_hw *hw = priv->hw;
 	struct page_pool *pool = pcie_priv->rx_page_pool;
 	struct pcie_desc_data *desc;

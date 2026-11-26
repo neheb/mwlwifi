@@ -83,7 +83,7 @@ static int pcie_wait_block_ack(struct pcie_priv *pcie_priv)
 
 static void pcie_trigger_pcicmd_bootcode(struct pcie_priv *pcie_priv)
 {
-	writel(pcie_priv->mwl_priv->pphys_cmd_buf,
+	writel(pcie_mwl_priv(pcie_priv)->pphys_cmd_buf,
 	       pcie_priv->iobase1 + MACREG_REG_GEN_PTR);
 	writel(0x00, pcie_priv->iobase1 + MACREG_REG_INT_CODE);
 	writel(MACREG_H2ARIC_BIT_DOOR_BELL,

@@ -580,7 +580,6 @@ struct pcie_pfu_dma_data {
 } __packed __aligned(2);
 
 struct pcie_priv {
-	struct mwl_priv *mwl_priv;
 	struct pci_dev *pdev;
 	void __iomem *iobase0; /* MEM Base Address Register 0  */
 	void __iomem *iobase1; /* MEM Base Address Register 1  */
@@ -641,6 +640,12 @@ struct pcie_priv {
 	struct pcie_data_buf *txbd_ring[PCIE_MAX_TXRX_BD];
 	struct sk_buff *tx_buf_list[PCIE_MAX_TXRX_BD];
 };
+
+/* PCIe private data sits in mwl_priv's tail-allocated hif_data area. */
+static inline struct mwl_priv *pcie_mwl_priv(struct pcie_priv *pcie_priv)
+{
+	return container_of((void *)pcie_priv, struct mwl_priv, hif_data);
+}
 
 enum { /* Definition of accounting record codes */
 	ACNT_CODE_BUSY = 0,   /* Marked busy until filled in                  */

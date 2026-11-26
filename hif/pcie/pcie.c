@@ -107,7 +107,7 @@ static int pcie_alloc_resource(struct pcie_priv *pcie_priv)
 
 static u32 pcie_read_mac_reg(struct pcie_priv *pcie_priv, u32 offset)
 {
-	struct mwl_priv *priv = pcie_priv->mwl_priv;
+	struct mwl_priv *priv = pcie_mwl_priv(pcie_priv);
 
 	if (priv->chip_type == MWL8964) {
 		/* The firmware returns as many words as the length asks for. */
@@ -124,7 +124,7 @@ static u32 pcie_read_mac_reg(struct pcie_priv *pcie_priv, u32 offset)
 
 static bool pcie_chk_adapter(struct pcie_priv *pcie_priv)
 {
-	struct mwl_priv *priv = pcie_priv->mwl_priv;
+	struct mwl_priv *priv = pcie_mwl_priv(pcie_priv);
 	u32 regval;
 
 	regval = readl(pcie_priv->iobase1 + MACREG_REG_INT_CODE);
@@ -143,7 +143,7 @@ static bool pcie_chk_adapter(struct pcie_priv *pcie_priv)
 
 static void pcie_send_cmd(struct pcie_priv *pcie_priv)
 {
-	writel(pcie_priv->mwl_priv->pphys_cmd_buf,
+	writel(pcie_mwl_priv(pcie_priv)->pphys_cmd_buf,
 	       pcie_priv->iobase1 + MACREG_REG_GEN_PTR);
 	writel(MACREG_H2ARIC_BIT_DOOR_BELL,
 	       pcie_priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
@@ -1622,7 +1622,6 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	priv->antenna_tx = pcie_chip_tbl[priv->chip_type].antenna_tx;
 	priv->antenna_rx = pcie_chip_tbl[priv->chip_type].antenna_rx;
 	pcie_priv = priv->hif.priv;
-	pcie_priv->mwl_priv = priv;
 
 	pcie_priv->pdev = pdev;
 	if (id->driver_data != MWL8964) {
