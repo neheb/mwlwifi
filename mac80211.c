@@ -1036,10 +1036,14 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 			}
 
 			mwl_fwcmd_remove_stream(hw, stream);
-			ieee80211_stop_tx_ba_cb_irqsafe(vif, addr, tid);
-		} else {
-			rc = -EPERM;
 		}
+
+		/* Stopping must not fail. Only STOP_CONT waits for the
+		 * callback: for the FLUSH actions mac80211 tears the
+		 * session down itself.
+		 */
+		if (action == IEEE80211_AMPDU_TX_STOP_CONT)
+			ieee80211_stop_tx_ba_cb_irqsafe(vif, addr, tid);
 		break;
 	case IEEE80211_AMPDU_TX_OPERATIONAL:
 		if (stream) {
