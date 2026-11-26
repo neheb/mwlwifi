@@ -281,7 +281,7 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 		return;
 
 	beacon_info = &vif->beacon_info;
-	memset(beacon_info, 0, sizeof(struct beacon_info));
+	memset(beacon_info, 0, sizeof(*beacon_info));
 	beacon_info->valid = false;
 	beacon_info->ie_ht_ptr = &beacon_info->ie_list_ht[0];
 	beacon_info->ie_vht_ptr = &beacon_info->ie_list_vht[0];
@@ -1409,7 +1409,7 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 	} else {
 		mwl_fwcmd_get_survey(hw, 0);
 		memset(&priv->cur_survey_info, 0,
-		       sizeof(struct mwl_survey_info));
+		       sizeof(priv->cur_survey_info));
 	}
 
 	return 0;
@@ -3472,6 +3472,6 @@ void mwl_fwcmd_get_survey(struct ieee80211_hw *hw, int idx)
 		survey_info = &priv->cur_survey_info;
 
 	memcpy(&survey_info->channel, conf->chandef.chan,
-	       sizeof(struct ieee80211_channel));
+	       sizeof(survey_info->channel));
 	mwl_hif_get_survey(hw, survey_info);
 }

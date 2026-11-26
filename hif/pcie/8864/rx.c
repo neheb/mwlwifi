@@ -135,7 +135,7 @@ static int pcie_rx_ring_init(struct mwl_priv *priv)
 			desc->prx_ring[i].rx_control =
 				EAGLE_RXD_CTRL_DRIVER_OWN;
 			val = (u32)desc->pphys_rx_ring +
-			      ((i + 1) * sizeof(struct pcie_rx_desc));
+			      ((i + 1) * sizeof(*desc->prx_ring));
 			desc->prx_ring[i].pphys_next = cpu_to_le32(val);
 			if (i < (PCIE_MAX_NUM_RX_DESC - 1))
 				rx_hndl->pnext = &desc->rx_hndl[i + 1];

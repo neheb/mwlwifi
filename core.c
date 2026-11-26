@@ -393,9 +393,7 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 
 		if (prop) {
 			/* Reset the whole table */
-			for (i = 0; i < SYSADPT_MAX_NUM_CHANNELS; i++)
-				memset(&priv->tx_pwr_tbl[i], 0,
-				       sizeof(struct mwl_tx_pwr_tbl));
+			memset(priv->tx_pwr_tbl, 0, sizeof(priv->tx_pwr_tbl));
 
 			/* Load related power table: each entry is channel,
 			 * setcap, the power levels, cdd and txantenna2.
@@ -1152,7 +1150,7 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 	priv->rx_decrypt = false;
 	priv->ampdu_num = mwl_hif_get_ampdu_num(hw);
 	priv->ampdu =
-		kzalloc(priv->ampdu_num * sizeof(*priv->ampdu), GFP_KERNEL);
+		kcalloc(priv->ampdu_num, sizeof(*priv->ampdu), GFP_KERNEL);
 	if (!priv->ampdu) {
 		ieee80211_free_hw(hw);
 		pr_err("alloc ampdu stream failed\n");
@@ -1164,7 +1162,7 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 	else
 		priv->stnid_num = SYSADPT_MAX_STA;
 	priv->stnid =
-		kzalloc(priv->stnid_num * sizeof(struct mwl_stnid), GFP_KERNEL);
+		kcalloc(priv->stnid_num, sizeof(*priv->stnid), GFP_KERNEL);
 	if (!priv->stnid) {
 		kfree(priv->ampdu);
 		ieee80211_free_hw(hw);
