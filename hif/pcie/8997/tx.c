@@ -498,18 +498,15 @@ void pcie_8997_tx_deinit(struct ieee80211_hw *hw)
 
 }
 
-void pcie_8997_tx_skbs(unsigned long data)
+void pcie_8997_tx_skbs(struct work_struct *work)
 {
-	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
-	struct mwl_priv *priv = hw->priv;
-	struct pcie_priv *pcie_priv = priv->hif.priv;
+	struct pcie_priv *pcie_priv = from_work(pcie_priv, work, tx_work);
+	struct mwl_priv *priv = pcie_priv->mwl_priv;
+	struct ieee80211_hw *hw = priv->hw;
 	int num = SYSADPT_TX_WMM_QUEUES;
 	struct sk_buff *tx_skb;
 	struct mwl_amsdu_frag *amsdu_frag;
 	struct mwl_sta *sta_info;
-
-	if (pcie_priv->data_tasks_killed)
-		return;
 
 	spin_lock_bh(&pcie_priv->tx_desc_lock);
 	while (num--) {
@@ -573,26 +570,22 @@ void pcie_8997_tx_skbs(unsigned long data)
 	spin_unlock_bh(&pcie_priv->tx_desc_lock);
 }
 
-/* Called while the tasklets are disabled; does not schedule them. */
-void pcie_8997_tx_done(unsigned long data)
+/* Called while the TX work is disabled; does not schedule it. */
+void pcie_8997_tx_done(struct ieee80211_hw *hw)
 {
-	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
 	struct mwl_priv *priv = hw->priv;
 
 	pcie_pfu_tx_done(priv);
 }
 
-void pcie_8997_tx_done_task(unsigned long data)
+void pcie_8997_tx_done_task(struct work_struct *work)
 {
-	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
-	struct mwl_priv *priv = hw->priv;
-	struct pcie_priv *pcie_priv = priv->hif.priv;
-
-	if (pcie_priv->data_tasks_killed)
-		return;
+	struct pcie_priv *pcie_priv = from_work(pcie_priv, work, tx_done_work);
+	struct mwl_priv *priv = pcie_priv->mwl_priv;
+	struct ieee80211_hw *hw = priv->hw;
 
 	pcie_pfu_tx_done(priv);
-	tasklet_schedule(&pcie_priv->tx_task);
+	pcie_schedule_tx(pcie_priv);
 	priv->hif.ops->irq_enable(hw);
 }
 
@@ -788,7 +781,7 @@ void pcie_8997_tx_xmit(struct ieee80211_hw *hw,
 
 	skb_queue_tail(&pcie_priv->txq[index], skb);
 
-	tasklet_schedule(&pcie_priv->tx_task);
+	pcie_schedule_tx(pcie_priv);
 
 	/* Initiate the ampdu session here */
 	if (start_ba_session) {

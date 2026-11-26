@@ -109,7 +109,7 @@ static int mwl_mac80211_start(struct ieee80211_hw *hw)
 	struct mwl_priv *priv = hw->priv;
 	int rc;
 
-	/* Enable TX and RX tasklets. */
+	/* Enable the TX work and RX NAPI. */
 	mwl_hif_enable_data_tasks(hw);
 
 	/* Enable interrupts */
@@ -169,7 +169,7 @@ static void mwl_mac80211_stop(struct ieee80211_hw *hw, bool suspend)
 	/* Disable interrupts */
 	mwl_hif_irq_disable(hw);
 
-	/* Disable TX and RX tasklets. */
+	/* Disable the TX work and RX NAPI. */
 	mwl_hif_disable_data_tasks(hw);
 
 	/* Return all skbs to mac80211 */

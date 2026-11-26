@@ -458,17 +458,14 @@ void pcie_tx_deinit_ndp(struct ieee80211_hw *hw)
 	pcie_tx_ring_free_ndp(priv);
 }
 
-void pcie_tx_skbs_ndp(unsigned long data)
+void pcie_tx_skbs_ndp(struct work_struct *work)
 {
-	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
-	struct mwl_priv *priv = hw->priv;
-	struct pcie_priv *pcie_priv = priv->hif.priv;
+	struct pcie_priv *pcie_priv = from_work(pcie_priv, work, tx_work);
+	struct mwl_priv *priv = pcie_priv->mwl_priv;
+	struct ieee80211_hw *hw = priv->hw;
 	int num = SYSADPT_TX_WMM_QUEUES;
 	struct sk_buff *tx_skb;
 	int rc;
-
-	if (pcie_priv->data_tasks_killed)
-		return;
 
 	while (num--) {
 		while (skb_queue_len(&pcie_priv->txq[num]) > 0) {
@@ -787,7 +784,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 
 	skb_queue_tail(&pcie_priv->txq[index], skb);
 
-	tasklet_schedule(&pcie_priv->tx_task);
+	pcie_schedule_tx(pcie_priv);
 
 	/* Initiate the ampdu session here */
 	if (start_ba_session) {

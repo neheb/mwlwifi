@@ -20,9 +20,9 @@
 
 int pcie_8997_tx_init(struct ieee80211_hw *hw);
 void pcie_8997_tx_deinit(struct ieee80211_hw *hw);
-void pcie_8997_tx_skbs(unsigned long data);
-void pcie_8997_tx_done(unsigned long data);
-void pcie_8997_tx_done_task(unsigned long data);
+void pcie_8997_tx_skbs(struct work_struct *work);
+void pcie_8997_tx_done(struct ieee80211_hw *hw);
+void pcie_8997_tx_done_task(struct work_struct *work);
 void pcie_8997_tx_xmit(struct ieee80211_hw *hw,
 		       struct ieee80211_tx_control *control,
 		       struct sk_buff *skb);

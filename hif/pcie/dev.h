@@ -580,8 +580,8 @@ struct pcie_priv {
 	struct sk_buff_head txq[PCIE_NUM_OF_DESC_DATA];
 
 	spinlock_t int_mask_lock ____cacheline_aligned_in_smp;
-	struct tasklet_struct tx_task;
-	struct tasklet_struct tx_done_task;
+	struct work_struct tx_work;      /* on system_bh_wq */
+	struct work_struct tx_done_work; /* on system_bh_wq */
 	/* NAPI */
 	struct net_device *napi_dev;
 	struct napi_struct napi;
@@ -603,7 +603,6 @@ struct pcie_priv {
 	struct pcie_desc_data_ndp desc_data_ndp;
 	int tx_done_cnt;
 	int tx_done_timer_cnt;
-	bool data_tasks_killed;
 	struct ieee80211_sta *sta_link[SYSADPT_MAX_STA_SC4 + 1];
 	struct ndp_rx_counter rx_cnts;
 	u32 recheck_rxringdone;
@@ -1058,6 +1057,14 @@ static inline struct sk_buff *pcie_rx_build_skb(struct page_pool *pool,
 	skb_reserve(skb, pool->p.offset);
 
 	return skb;
+}
+
+/* The TX work items run in softirq context, like the tasklets they
+ * replace.
+ */
+static inline void pcie_schedule_tx(struct pcie_priv *pcie_priv)
+{
+	queue_work(system_bh_wq, &pcie_priv->tx_work);
 }
 
 static inline void pcie_mask_int(struct pcie_priv *pcie_priv,

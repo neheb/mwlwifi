@@ -462,11 +462,6 @@ int pcie_rx_poll_ndp(struct napi_struct *napi, int budget)
 	struct pcie_dma_data *dma_data;
 	u8 signal;
 
-	if (pcie_priv->data_tasks_killed) {
-		napi_complete(napi);
-		return 0;
-	}
-
 	/* Mask the ring indices like the TX path does: they come from
 	 * device registers and index host arrays.
 	 */
