@@ -785,15 +785,31 @@ static void mwl_wds_check_handle(struct work_struct *work)
 			if (ether_addr_equal(sta->addr, priv->wds_check_sta)) {
 				ether_addr_copy(addr, sta->addr);
 				macid = sta_info->mwl_vif->macid;
-				sta_info->wds = true;
 				wds_sta = true;
 				break;
 			}
 		}
 	}
 
-	if (wds_sta)
-		mwl_fwcmd_set_new_stn_wds_sc4(priv->hw, macid, addr);
+	/* Mark the station only once the firmware has taken it, so that a
+	 * later 4-address frame retries a failed command.
+	 */
+	if (wds_sta && mwl_fwcmd_set_new_stn_wds_sc4(priv->hw, macid, addr)) {
+		wiphy_warn_ratelimited(priv->hw->wiphy,
+				       "failed to set %pM as WDS station\n",
+				       addr);
+	} else if (wds_sta) {
+		scoped_guard(spinlock_bh, &priv->sta_lock) {
+			list_for_each_entry(sta_info, &priv->sta_list, list) {
+				sta = container_of((void *)sta_info,
+						   struct ieee80211_sta, drv_priv);
+				if (ether_addr_equal(sta->addr, addr)) {
+					WRITE_ONCE(sta_info->wds, true);
+					break;
+				}
+			}
+		}
+	}
 
 	WRITE_ONCE(priv->wds_check, false);
 }
