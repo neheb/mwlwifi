@@ -71,37 +71,31 @@ static inline void mwl_hif_deinit(struct ieee80211_hw *hw)
 		priv->hif.ops->deinit(hw);
 }
 
-static inline int mwl_hif_get_info(struct ieee80211_hw *hw,
-				   char *buf, size_t size)
+static inline void mwl_hif_get_info(struct ieee80211_hw *hw,
+				    struct seq_file *s)
 {
 	struct mwl_priv *priv = hw->priv;
 
 	if (priv->hif.ops->get_info)
-		return priv->hif.ops->get_info(hw, buf, size);
-	else
-		return 0;
+		priv->hif.ops->get_info(hw, s);
 }
 
-static inline int mwl_hif_get_tx_status(struct ieee80211_hw *hw,
-					char *buf, size_t size)
+static inline void mwl_hif_get_tx_status(struct ieee80211_hw *hw,
+					 struct seq_file *s)
 {
 	struct mwl_priv *priv = hw->priv;
 
 	if (priv->hif.ops->get_tx_status)
-		return priv->hif.ops->get_tx_status(hw, buf, size);
-	else
-		return 0;
+		priv->hif.ops->get_tx_status(hw, s);
 }
 
-static inline int mwl_hif_get_rx_status(struct ieee80211_hw *hw,
-					char *buf, size_t size)
+static inline void mwl_hif_get_rx_status(struct ieee80211_hw *hw,
+					 struct seq_file *s)
 {
 	struct mwl_priv *priv = hw->priv;
 
 	if (priv->hif.ops->get_rx_status)
-		return priv->hif.ops->get_rx_status(hw, buf, size);
-	else
-		return 0;
+		priv->hif.ops->get_rx_status(hw, s);
 }
 
 static inline void mwl_hif_enable_data_tasks(struct ieee80211_hw *hw)

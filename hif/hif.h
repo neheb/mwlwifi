@@ -36,6 +36,8 @@ struct mwl_survey_info {
 	s8 noise;
 };
 
+struct seq_file;
+
 struct mwl_hif_ops {
 	const char *driver_name;
 	const char *driver_version;
@@ -44,9 +46,9 @@ struct mwl_hif_ops {
 	void (*reset)(struct ieee80211_hw *hw);
 	int (*init)(struct ieee80211_hw *hw);
 	void (*deinit)(struct ieee80211_hw *hw);
-	int (*get_info)(struct ieee80211_hw *hw, char *buf, size_t size);
-	int (*get_tx_status)(struct ieee80211_hw *hw, char *buf, size_t size);
-	int (*get_rx_status)(struct ieee80211_hw *hw, char *buf, size_t size);
+	void (*get_info)(struct ieee80211_hw *hw, struct seq_file *s);
+	void (*get_tx_status)(struct ieee80211_hw *hw, struct seq_file *s);
+	void (*get_rx_status)(struct ieee80211_hw *hw, struct seq_file *s);
 	void (*enable_data_tasks)(struct ieee80211_hw *hw);
 	void (*disable_data_tasks)(struct ieee80211_hw *hw);
 	int (*exec_cmd)(struct ieee80211_hw *hw, unsigned short cmd);
