@@ -254,7 +254,8 @@ struct mwl_vif *utils_find_vif_bss(struct mwl_priv *priv, u8 *bssid)
 {
 	struct mwl_vif *mwl_vif;
 
-	guard(spinlock_bh)(&priv->vif_lock);
+	lockdep_assert_held(&priv->vif_lock);
+
 	list_for_each_entry(mwl_vif, &priv->vif_list, list) {
 		if (ether_addr_equal(bssid, mwl_vif->bssid))
 			return mwl_vif;
@@ -267,7 +268,8 @@ struct mwl_sta *utils_find_sta(struct mwl_priv *priv, u8 *addr)
 	struct mwl_sta *sta_info;
 	struct ieee80211_sta *sta;
 
-	guard(spinlock_bh)(&priv->sta_lock);
+	lockdep_assert_held(&priv->sta_lock);
+
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
 		sta = container_of((void *)sta_info, struct ieee80211_sta,
 				   drv_priv);
@@ -282,7 +284,8 @@ struct mwl_sta *utils_find_sta_by_aid(struct mwl_priv *priv, u16 aid)
 	struct mwl_sta *sta_info;
 	struct ieee80211_sta *sta;
 
-	guard(spinlock_bh)(&priv->sta_lock);
+	lockdep_assert_held(&priv->sta_lock);
+
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
 		sta = container_of((void *)sta_info, struct ieee80211_sta,
 				   drv_priv);
@@ -296,7 +299,8 @@ struct mwl_sta *utils_find_sta_by_id(struct mwl_priv *priv, u16 stnid)
 {
 	struct mwl_sta *sta_info;
 
-	guard(spinlock_bh)(&priv->sta_lock);
+	lockdep_assert_held(&priv->sta_lock);
+
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
 		if (sta_info->stnid == stnid)
 			return sta_info;

@@ -106,6 +106,10 @@ u8 utils_get_rate_id(u8 rate);
 u32 utils_get_init_tx_rate(struct mwl_priv *priv, struct ieee80211_conf *conf,
 			   struct ieee80211_sta *sta);
 
+/* The caller holds vif_lock (utils_find_vif_bss()) or sta_lock (the
+ * others) for as long as it uses what they return: the interface or
+ * station can be freed once it is dropped.
+ */
 struct mwl_vif *utils_find_vif_bss(struct mwl_priv *priv, u8 *bssid);
 
 struct mwl_sta *utils_find_sta(struct mwl_priv *priv, u8 *addr);

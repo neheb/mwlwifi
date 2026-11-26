@@ -1455,9 +1455,10 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 			break;
 		case ACNT_CODE_TX_ENQUEUE:
 			acnt_tx = (struct acnt_tx_s *)pstart;
-			sta_info = utils_find_sta(priv, acnt_tx->hdr.wh.addr1);
-			if (sta_info) {
-				scoped_guard(spinlock_bh, &priv->sta_lock)
+			scoped_guard(spinlock_bh, &priv->sta_lock) {
+				sta_info = utils_find_sta(priv,
+							  acnt_tx->hdr.wh.addr1);
+				if (sta_info)
 					pcie_tx_account(priv, sta_info, acnt_tx);
 			}
 			break;
@@ -1482,9 +1483,10 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 			}
 			dma_data = (struct pcie_dma_data *)
 				&acnt_rx->rx_info.hdr[0];
-			sta_info = utils_find_sta(priv, dma_data->wh.addr2);
-			if (sta_info) {
-				scoped_guard(spinlock_bh, &priv->sta_lock)
+			scoped_guard(spinlock_bh, &priv->sta_lock) {
+				sta_info = utils_find_sta(priv,
+							  dma_data->wh.addr2);
+				if (sta_info)
 					pcie_rx_account(priv, sta_info, acnt_rx);
 			}
 			break;
@@ -1508,23 +1510,24 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 					else
 						priv->ra_tx_attempt[type][0]++;
 				}
-				sta_info = utils_find_sta_by_id(priv, stnid);
-				if (sta_info) {
-					scoped_guard(spinlock_bh, &priv->sta_lock)
-						pcie_tx_per(priv, sta_info, acnt_ra);
+				scoped_guard(spinlock_bh, &priv->sta_lock) {
+					sta_info = utils_find_sta_by_id(priv,
+									stnid);
+					if (sta_info)
+						pcie_tx_per(priv, sta_info,
+							    acnt_ra);
 				}
 			}
 			break;
 		case ACNT_CODE_BA_STATS:
 			acnt_ba = (struct acnt_ba_s *)pstart;
 			if (priv->ba_aid) {
-				sta_info = utils_find_sta_by_aid(priv,
-								 priv->ba_aid);
-				if (sta_info) {
-					scoped_guard(spinlock_bh, &priv->sta_lock) {
+				scoped_guard(spinlock_bh, &priv->sta_lock) {
+					sta_info = utils_find_sta_by_aid(priv,
+									 priv->ba_aid);
+					if (sta_info)
 						pcie_ba_account(priv, sta_info,
 								acnt_ba);
-					}
 				}
 			}
 			break;

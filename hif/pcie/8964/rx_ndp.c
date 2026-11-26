@@ -341,18 +341,25 @@ static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 		wh = (struct ieee80211_hdr *)skb->data;
 
 		if (ieee80211_has_protected(wh->frame_control)) {
-			if (ieee80211_has_tods(wh->frame_control)) {
-				mwl_vif = utils_find_vif_bss(priv, wh->addr1);
-				if (!mwl_vif &&
-				    ieee80211_has_a4(wh->frame_control))
-					mwl_vif =
-						utils_find_vif_bss(priv,
-								   wh->addr2);
-			} else {
-				mwl_vif = utils_find_vif_bss(priv, wh->addr2);
+			bool hw_crypto = false;
+
+			scoped_guard(spinlock_bh, &priv->vif_lock) {
+				if (ieee80211_has_tods(wh->frame_control)) {
+					mwl_vif = utils_find_vif_bss(priv,
+								     wh->addr1);
+					if (!mwl_vif &&
+					    ieee80211_has_a4(wh->frame_control))
+						mwl_vif = utils_find_vif_bss(priv,
+									     wh->addr2);
+				} else {
+					mwl_vif = utils_find_vif_bss(priv,
+								     wh->addr2);
+				}
+				if (mwl_vif)
+					hw_crypto = mwl_vif->is_hw_crypto_enabled;
 			}
 
-			if ((mwl_vif && mwl_vif->is_hw_crypto_enabled) ||
+			if (hw_crypto ||
 			    is_multicast_ether_addr(wh->addr1) ||
 			    (ieee80211_is_mgmt(wh->frame_control) &&
 			    !is_multicast_ether_addr(wh->addr1))) {

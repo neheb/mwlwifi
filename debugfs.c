@@ -931,27 +931,6 @@ static ssize_t mwl_debugfs_tx_hist_write(struct file *file,
 	return count;
 }
 
-/* Like utils_find_sta_by_aid(), but the caller holds sta_lock and keeps it
- * for as long as it uses the station.
- */
-static struct mwl_sta *mwl_debugfs_find_sta_locked(struct mwl_priv *priv,
-						   u16 aid)
-{
-	struct mwl_sta *sta_info;
-	struct ieee80211_sta *sta;
-
-	lockdep_assert_held(&priv->sta_lock);
-
-	list_for_each_entry(sta_info, &priv->sta_list, list) {
-		sta = container_of((void *)sta_info, struct ieee80211_sta,
-				   drv_priv);
-		if (sta->aid == aid)
-			return sta_info;
-	}
-
-	return NULL;
-}
-
 static int mwl_debugfs_ba_hist_show(struct seq_file *s, void *data)
 {
 	struct mwl_priv *priv = s->private;
@@ -968,7 +947,7 @@ static int mwl_debugfs_ba_hist_show(struct seq_file *s, void *data)
 	 * file frees it, under sta_lock.
 	 */
 	guard(spinlock_bh)(&priv->sta_lock);
-	sta_info = mwl_debugfs_find_sta_locked(priv, priv->ba_aid);
+	sta_info = utils_find_sta_by_aid(priv, priv->ba_aid);
 	if (sta_info && sta_info->ba_hist.enable &&
 	    sta_info->ba_hist.ba_stats) {
 		ba_stats = sta_info->ba_hist.ba_stats;
@@ -1055,7 +1034,7 @@ static ssize_t mwl_debugfs_ba_hist_write(struct file *file,
 
 	scoped_guard(spinlock_bh, &priv->sta_lock) {
 		if (priv->ba_aid) {
-			sta_info = mwl_debugfs_find_sta_locked(priv, priv->ba_aid);
+			sta_info = utils_find_sta_by_aid(priv, priv->ba_aid);
 			if (sta_info) {
 				sta_info->ba_hist.enable = false;
 				old_stats = sta_info->ba_hist.ba_stats;
@@ -1063,7 +1042,7 @@ static ssize_t mwl_debugfs_ba_hist_write(struct file *file,
 			}
 		}
 		priv->ba_aid = 0;
-		sta_info = mwl_debugfs_find_sta_locked(priv, sta_aid);
+		sta_info = utils_find_sta_by_aid(priv, sta_aid);
 		if (sta_info) {
 			/* The same station may have been selected before. */
 			kfree(old_stats);
