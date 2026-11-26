@@ -373,18 +373,19 @@ struct beacon_info {
 	u8 *ie_meshid_ptr;
 	u8 *ie_meshcfg_ptr;
 	u8 *ie_meshchsw_ptr;
-	u8 ie_wmm_len;
-	u8 ie_wsc_len;
-	u8 ie_wpa_len;
-	u8 ie_rsn48_len;
-	u8 ie_mde_len;
-	u8 ie_rsnx_len;
+	/* An element with its header can be 257 bytes long. */
+	u16 ie_wmm_len;
+	u16 ie_wsc_len;
+	u16 ie_wpa_len;
+	u16 ie_rsn48_len;
+	u16 ie_mde_len;
+	u16 ie_rsnx_len;
 	u16 ie_ht_len;
 	u16 ie_vht_len;
-	u8 ie_country_len;
-	u8 ie_meshid_len;
-	u8 ie_meshcfg_len;
-	u8 ie_meshchsw_len;
+	u16 ie_country_len;
+	u16 ie_meshid_len;
+	u16 ie_meshcfg_len;
+	u16 ie_meshchsw_len;
 	/* Elements not handled above, passed through to the firmware */
 	u8 ie_list_other[MWL_IE_LIST_PROPRIETARY_LEN];
 	u8 ie_other_len;

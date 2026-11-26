@@ -1846,7 +1846,7 @@ int mwl_fwcmd_set_beacon(struct ieee80211_hw *hw,
 
 	if (mwl_fwcmd_set_wsc_ie(hw, b_inf->ie_wsc_len, b_inf->ie_wsc_ptr))
 		goto err;
-	mwl_vif->wsc_ie_len = min_t(u8, b_inf->ie_wsc_len,
+	mwl_vif->wsc_ie_len = min_t(size_t, b_inf->ie_wsc_len,
 				    sizeof(mwl_vif->wsc_ie));
 	memcpy(mwl_vif->wsc_ie, b_inf->ie_wsc_ptr, mwl_vif->wsc_ie_len);
 
@@ -2734,7 +2734,7 @@ int mwl_fwcmd_set_optimization_level(struct ieee80211_hw *hw, u8 opt_level)
 	return 0;
 }
 
-int mwl_fwcmd_set_wsc_ie(struct ieee80211_hw *hw, u8 len, u8 *data)
+int mwl_fwcmd_set_wsc_ie(struct ieee80211_hw *hw, u16 len, u8 *data)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_wsc_ie *pcmd;
