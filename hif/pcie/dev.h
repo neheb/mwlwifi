@@ -586,7 +586,6 @@ struct pcie_priv {
 	struct pci_dev *pdev;
 	void __iomem *iobase0; /* MEM Base Address Register 0  */
 	void __iomem *iobase1; /* MEM Base Address Register 1  */
-	u32 next_bar_num;
 
 	struct sk_buff_head txq[PCIE_NUM_OF_DESC_DATA];
 

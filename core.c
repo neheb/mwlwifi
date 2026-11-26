@@ -1126,10 +1126,8 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 	priv_size = ALIGN(sizeof(*priv), NETDEV_ALIGN) + hif_data_len;
 
 	hw = ieee80211_alloc_hw(priv_size, &mwl_mac80211_ops);
-	if (!hw) {
-		pr_err("ieee80211 alloc hw failed\n");
+	if (!hw)
 		return NULL;
-	}
 
 	priv = hw->priv;
 	priv->hw = hw;
@@ -1149,11 +1147,10 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 	priv->debug_ampdu = false;
 	priv->rx_decrypt = false;
 	priv->ampdu_num = mwl_hif_get_ampdu_num(hw);
-	priv->ampdu =
-		kcalloc(priv->ampdu_num, sizeof(*priv->ampdu), GFP_KERNEL);
+	priv->ampdu = devm_kcalloc(dev, priv->ampdu_num, sizeof(*priv->ampdu),
+				   GFP_KERNEL);
 	if (!priv->ampdu) {
 		ieee80211_free_hw(hw);
-		pr_err("alloc ampdu stream failed\n");
 		return NULL;
 	}
 
@@ -1161,12 +1158,10 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 		priv->stnid_num = SYSADPT_MAX_STA_SC4;
 	else
 		priv->stnid_num = SYSADPT_MAX_STA;
-	priv->stnid =
-		kcalloc(priv->stnid_num, sizeof(*priv->stnid), GFP_KERNEL);
+	priv->stnid = devm_kcalloc(dev, priv->stnid_num, sizeof(*priv->stnid),
+				   GFP_KERNEL);
 	if (!priv->stnid) {
-		kfree(priv->ampdu);
 		ieee80211_free_hw(hw);
-		pr_err("alloc stnid failed\n");
 		return NULL;
 	}
 	priv->available_stnid = 0;
@@ -1183,8 +1178,6 @@ void mwl_free_hw(struct ieee80211_hw *hw)
 	of_node_put(priv->pwr_node);
 	of_node_put(priv->dt_node);
 
-	kfree(priv->stnid);
-	kfree(priv->ampdu);
 	ieee80211_free_hw(hw);
 }
 

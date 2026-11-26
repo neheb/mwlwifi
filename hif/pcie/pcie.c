@@ -86,38 +86,23 @@ static struct mwl_chip_info pcie_chip_tbl[] = {
 static int pcie_alloc_resource(struct pcie_priv *pcie_priv)
 {
 	struct pci_dev *pdev = pcie_priv->pdev;
-	struct device *dev = &pdev->dev;
-	void __iomem *addr;
+	int bar1 = 1;
 
-	pcie_priv->next_bar_num = 1;	/* 32-bit */
-	if (pci_resource_flags(pdev, 0) & 0x04)
-		pcie_priv->next_bar_num = 2;	/* 64-bit */
+	/* A 64-bit BAR 0 takes two BAR slots. */
+	if (pci_resource_flags(pdev, 0) & IORESOURCE_MEM_64)
+		bar1 = 2;
 
-	addr = devm_ioremap_resource(dev, &pdev->resource[0]);
-	if (IS_ERR(addr)) {
-		pr_err("%s: cannot reserve PCI memory region 0\n",
-		       PCIE_DRV_NAME);
-		goto err;
-	}
-	pcie_priv->iobase0 = addr;
-	pr_debug("iobase0 = %p\n", pcie_priv->iobase0);
+	pcie_priv->iobase0 = pcim_iomap_region(pdev, 0, PCIE_DRV_NAME);
+	if (IS_ERR(pcie_priv->iobase0))
+		return dev_err_probe(&pdev->dev, PTR_ERR(pcie_priv->iobase0),
+				     "cannot map BAR 0\n");
 
-	addr = devm_ioremap_resource(dev,
-				     &pdev->resource[pcie_priv->next_bar_num]);
-	if (IS_ERR(addr)) {
-		pr_err("%s: cannot reserve PCI memory region 1\n",
-		       PCIE_DRV_NAME);
-		goto err;
-	}
-	pcie_priv->iobase1 = addr;
-	pr_debug("iobase1 = %p\n", pcie_priv->iobase1);
+	pcie_priv->iobase1 = pcim_iomap_region(pdev, bar1, PCIE_DRV_NAME);
+	if (IS_ERR(pcie_priv->iobase1))
+		return dev_err_probe(&pdev->dev, PTR_ERR(pcie_priv->iobase1),
+				     "cannot map BAR %d\n", bar1);
 
 	return 0;
-
-err:
-	pr_err("pci alloc fail\n");
-
-	return -EIO;
 }
 
 static u32 pcie_read_mac_reg(struct pcie_priv *pcie_priv, u32 offset)
@@ -1593,7 +1578,6 @@ static const struct mwl_hif_ops pcie_hif_ops_ndp = {
 
 static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
-	static bool printed_version;
 	struct ieee80211_hw *hw;
 	struct mwl_priv *priv;
 	struct pcie_priv *pcie_priv;
@@ -1603,25 +1587,14 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (id->driver_data >= MWLUNKNOWN)
 		return -ENODEV;
 
-	if (!printed_version) {
-		pr_info("<<%s version %s>>\n",
-			PCIE_DRV_DESC, PCIE_DRV_VERSION);
-		printed_version = true;
-	}
-
 	rc = pcim_enable_device(pdev);
-	if (rc) {
-		pr_err("%s: cannot enable new PCI device\n",
-		       PCIE_DRV_NAME);
-		return rc;
-	}
+	if (rc)
+		return dev_err_probe(&pdev->dev, rc, "cannot enable device\n");
 
 	rc = dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
-	if (rc) {
-		pr_err("%s: 32-bit PCI DMA not supported\n",
-		       PCIE_DRV_NAME);
-		return rc;
-	}
+	if (rc)
+		return dev_err_probe(&pdev->dev, rc,
+				     "32-bit DMA not supported\n");
 
 	pci_set_master(pdev);
 
@@ -1634,11 +1607,8 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	hw = mwl_alloc_hw(MWL_BUS_PCIE, id->driver_data, &pdev->dev,
 			  hif_ops, sizeof(*pcie_priv));
-	if (!hw) {
-		pr_err("%s: mwlwifi hw alloc failed\n",
-		       PCIE_DRV_NAME);
+	if (!hw)
 		return -ENOMEM;
-	}
 
 	pci_set_drvdata(pdev, hw);
 
