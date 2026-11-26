@@ -780,12 +780,11 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 	return 0;
 }
 
-static int mwl_mac80211_sta_remove(struct ieee80211_hw *hw,
-				   struct ieee80211_vif *vif,
-				   struct ieee80211_sta *sta)
+static void mwl_mac80211_sta_remove(struct ieee80211_hw *hw,
+				    struct ieee80211_vif *vif,
+				    struct ieee80211_sta *sta)
 {
 	struct mwl_priv *priv = hw->priv;
-	int rc;
 	struct mwl_sta *sta_info = mwl_dev_get_sta(sta);
 	struct mwl_tx_ba_stats *ba_stats;
 
@@ -793,7 +792,10 @@ static int mwl_mac80211_sta_remove(struct ieee80211_hw *hw,
 	mwl_fwcmd_del_sta_streams(hw, sta);
 	mwl_hif_tx_del_pkts_via_sta(hw, sta);
 
-	rc = mwl_fwcmd_set_new_stn_del(hw, vif, sta->addr);
+	/* Going down a state must not fail, so carry on regardless. */
+	if (mwl_fwcmd_set_new_stn_del(hw, vif, sta->addr))
+		wiphy_warn(hw->wiphy, "failed to delete station %pM\n",
+			   sta->addr);
 
 	mwl_hif_set_sta_id(hw, sta, sta_info->link_sta_mode, false);
 
@@ -810,8 +812,6 @@ static int mwl_mac80211_sta_remove(struct ieee80211_hw *hw,
 	}
 
 	kfree(ba_stats);
-
-	return rc;
 }
 
 static int mwl_mac80211_sta_authorize_wds(struct ieee80211_hw *hw,
@@ -855,7 +855,7 @@ static int mwl_mac80211_sta_state(struct ieee80211_hw *hw,
 
 	if (old_state == IEEE80211_STA_ASSOC &&
 	    new_state == IEEE80211_STA_AUTH)
-		return mwl_mac80211_sta_remove(hw, vif, sta);
+		mwl_mac80211_sta_remove(hw, vif, sta);
 
 	if (old_state == IEEE80211_STA_ASSOC &&
 	    new_state == IEEE80211_STA_AUTHORIZED &&
@@ -979,8 +979,14 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 			tmp.sta = sta;
 			tmp.tid = tid;
 			spin_unlock_bh(&priv->stream_lock);
-			rc = mwl_fwcmd_destroy_ba(hw, &tmp,
-					     BA_FLAG_DIRECTION_DOWN);
+			/* RX_STOP must not fail: there is nothing mac80211
+			 * could do about it.
+			 */
+			if (mwl_fwcmd_destroy_ba(hw, &tmp,
+						 BA_FLAG_DIRECTION_DOWN))
+				wiphy_warn(hw->wiphy,
+					   "failed to stop rx ba session for %pM tid %u\n",
+					   sta->addr, tid);
 			spin_lock_bh(&priv->stream_lock);
 		}
 		break;
