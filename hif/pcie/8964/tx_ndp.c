@@ -63,31 +63,32 @@ static int pcie_tx_ring_alloc_ndp(struct mwl_priv *priv)
 	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
 	void *mem;
 
-	mem = dma_alloc_coherent(priv->dev,
-				 MAX_NUM_TX_RING_BYTES,
-				 &desc->pphys_tx_ring,
-				 GFP_KERNEL);
+	mem = dmam_alloc_coherent(priv->dev,
+				  MAX_NUM_TX_RING_BYTES,
+				  &desc->pphys_tx_ring,
+				  GFP_KERNEL);
 	if (!mem)
 		goto err_no_mem;
 	desc->ptx_ring = mem;
 
-	mem = dma_alloc_coherent(priv->dev,
-				 MAX_NUM_TX_RING_DONE_BYTES,
-				 &desc->pphys_tx_ring_done,
-				 GFP_KERNEL);
+	mem = dmam_alloc_coherent(priv->dev,
+				  MAX_NUM_TX_RING_DONE_BYTES,
+				  &desc->pphys_tx_ring_done,
+				  GFP_KERNEL);
 	if (!mem)
 		goto err_no_mem;
 	desc->ptx_ring_done = mem;
 
-	mem = dma_alloc_coherent(priv->dev,
-				 DEFAULT_ACNT_RING_SIZE,
-				 &desc->pphys_acnt_ring,
-				 GFP_KERNEL);
+	mem = dmam_alloc_coherent(priv->dev,
+				  DEFAULT_ACNT_RING_SIZE,
+				  &desc->pphys_acnt_ring,
+				  GFP_KERNEL);
 	if (!mem)
 		goto err_no_mem;
 	desc->pacnt_ring = mem;
 
-	desc->pacnt_buf = kzalloc(DEFAULT_ACNT_RING_SIZE, GFP_KERNEL);
+	desc->pacnt_buf = devm_kzalloc(priv->dev, DEFAULT_ACNT_RING_SIZE,
+				       GFP_KERNEL);
 	if (!desc->pacnt_buf)
 		goto err_no_mem;
 	desc->acnt_ring_size = DEFAULT_ACNT_RING_SIZE;
@@ -206,31 +207,10 @@ static void pcie_tx_ring_free_ndp(struct mwl_priv *priv)
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
 
-	if (desc->ptx_ring) {
-		dma_free_coherent(priv->dev,
-				  MAX_NUM_TX_RING_BYTES,
-				  desc->ptx_ring,
-				  desc->pphys_tx_ring);
-		desc->ptx_ring = NULL;
-	}
-
-	if (desc->ptx_ring_done) {
-		dma_free_coherent(priv->dev,
-				  MAX_NUM_TX_RING_DONE_BYTES,
-				  desc->ptx_ring_done,
-				  desc->pphys_tx_ring_done);
-		desc->ptx_ring_done = NULL;
-	}
-
-	if (desc->pacnt_ring) {
-		dma_free_coherent(priv->dev,
-				  DEFAULT_ACNT_RING_SIZE,
-				  desc->pacnt_ring,
-				  desc->pphys_acnt_ring);
-		desc->pacnt_ring = NULL;
-	}
-
-	kfree(desc->pacnt_buf);
+	/* The memory is freed when the device detaches. */
+	desc->ptx_ring = NULL;
+	desc->ptx_ring_done = NULL;
+	desc->pacnt_ring = NULL;
 	desc->pacnt_buf = NULL;
 }
 

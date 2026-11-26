@@ -76,9 +76,9 @@ static int pcie_tx_ring_alloc(struct mwl_priv *priv)
 
 	desc = &pcie_priv->desc_data[0];
 
-	mem = dma_alloc_coherent(priv->dev,
-				 MAX_NUM_TX_RING_BYTES *
-				 PCIE_NUM_OF_DESC_DATA,
+	mem = dmam_alloc_coherent(priv->dev,
+				  MAX_NUM_TX_RING_BYTES *
+				  PCIE_NUM_OF_DESC_DATA,
 				 &desc->pphys_tx_ring,
 				 GFP_KERNEL);
 
@@ -97,16 +97,10 @@ static int pcie_tx_ring_alloc(struct mwl_priv *priv)
 			num * MAX_NUM_TX_RING_BYTES);
 	}
 
-	mem = kzalloc(MAX_NUM_TX_HNDL_BYTES * PCIE_NUM_OF_DESC_DATA,
-		      GFP_KERNEL);
-
+	mem = devm_kcalloc(priv->dev, PCIE_NUM_OF_DESC_DATA,
+			   MAX_NUM_TX_HNDL_BYTES, GFP_KERNEL);
 	if (!mem) {
 		wiphy_err(priv->hw->wiphy, "cannot alloc mem\n");
-		dma_free_coherent(priv->dev,
-				  MAX_NUM_TX_RING_BYTES *
-				  PCIE_NUM_OF_DESC_DATA,
-				  pcie_priv->desc_data[0].ptx_ring,
-				  pcie_priv->desc_data[0].pphys_tx_ring);
 		return -ENOMEM;
 	}
 
@@ -212,22 +206,13 @@ static void pcie_tx_ring_free(struct mwl_priv *priv)
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	int num;
 
-	if (pcie_priv->desc_data[0].ptx_ring) {
-		dma_free_coherent(priv->dev,
-				  MAX_NUM_TX_RING_BYTES *
-				  PCIE_NUM_OF_DESC_DATA,
-				  pcie_priv->desc_data[0].ptx_ring,
-				  pcie_priv->desc_data[0].pphys_tx_ring);
-	}
-
+	/* The ring and handle memory are freed when the device detaches. */
 	for (num = 0; num < PCIE_NUM_OF_DESC_DATA; num++) {
-		if (pcie_priv->desc_data[num].ptx_ring)
-			pcie_priv->desc_data[num].ptx_ring = NULL;
+		pcie_priv->desc_data[num].ptx_ring = NULL;
+		pcie_priv->desc_data[num].tx_hndl = NULL;
 		pcie_priv->desc_data[num].pstale_tx_hndl = NULL;
 		pcie_priv->desc_data[num].pnext_tx_hndl = NULL;
 	}
-
-	kfree(pcie_priv->desc_data[0].tx_hndl);
 }
 
 static inline bool pcie_tx_available(struct mwl_priv *priv, int desc_num)

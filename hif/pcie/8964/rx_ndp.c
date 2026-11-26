@@ -38,7 +38,7 @@ static int pcie_rx_ring_alloc_ndp(struct mwl_priv *priv)
 	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
 
 	desc->prx_ring =
-		dma_alloc_coherent(priv->dev,
+		dmam_alloc_coherent(priv->dev,
 				   MAX_NUM_RX_RING_BYTES,
 				   &desc->pphys_rx_ring,
 				   GFP_KERNEL);
@@ -46,7 +46,7 @@ static int pcie_rx_ring_alloc_ndp(struct mwl_priv *priv)
 		goto err_no_mem;
 
 	desc->prx_ring_done =
-		dma_alloc_coherent(priv->dev,
+		dmam_alloc_coherent(priv->dev,
 				   MAX_NUM_RX_RING_DONE_BYTES,
 				   &desc->pphys_rx_ring_done,
 				   GFP_KERNEL);
@@ -130,22 +130,12 @@ static void pcie_rx_ring_free_ndp(struct mwl_priv *priv)
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
 
+	/* The ring memory is freed when the device detaches. */
 	if (desc->prx_ring) {
 		pcie_rx_ring_cleanup_ndp(priv);
-		dma_free_coherent(priv->dev,
-				  MAX_NUM_RX_RING_BYTES,
-				  desc->prx_ring,
-				  desc->pphys_rx_ring);
 		desc->prx_ring = NULL;
 	}
-
-	if (desc->prx_ring_done) {
-		dma_free_coherent(priv->dev,
-				  MAX_NUM_RX_RING_DONE_BYTES,
-				  desc->prx_ring_done,
-				  desc->pphys_rx_ring_done);
-		desc->prx_ring_done = NULL;
-	}
+	desc->prx_ring_done = NULL;
 
 	page_pool_destroy(pcie_priv->rx_page_pool);
 	pcie_priv->rx_page_pool = NULL;

@@ -47,7 +47,7 @@ static int pcie_rx_ring_alloc(struct mwl_priv *priv)
 	desc = &pcie_priv->desc_data[0];
 
 	desc->prx_ring =
-		dma_alloc_coherent(priv->dev,
+		dmam_alloc_coherent(priv->dev,
 				   MAX_NUM_RX_RING_BYTES,
 				   &desc->pphys_rx_ring,
 				   GFP_KERNEL);
@@ -57,12 +57,10 @@ static int pcie_rx_ring_alloc(struct mwl_priv *priv)
 		return -ENOMEM;
 	}
 
-	desc->rx_hndl = kzalloc(MAX_NUM_RX_HNDL_BYTES, GFP_KERNEL);
-
-	if (!desc->rx_hndl) {
-		rc = -ENOMEM;
-		goto err_free_ring;
-	}
+	desc->rx_hndl = devm_kzalloc(priv->dev, MAX_NUM_RX_HNDL_BYTES,
+				     GFP_KERNEL);
+	if (!desc->rx_hndl)
+		return -ENOMEM;
 
 	pcie_priv->rx_page_pool =
 		pcie_rx_create_page_pool(pcie_priv, PCIE_MAX_NUM_RX_DESC,
@@ -72,21 +70,10 @@ static int pcie_rx_ring_alloc(struct mwl_priv *priv)
 		rc = PTR_ERR(pcie_priv->rx_page_pool);
 		pcie_priv->rx_page_pool = NULL;
 		wiphy_err(priv->hw->wiphy, "cannot create page pool\n");
-		goto err_free_hndl;
+		return rc;
 	}
 
 	return 0;
-
-err_free_hndl:
-	kfree(desc->rx_hndl);
-	desc->rx_hndl = NULL;
-err_free_ring:
-	dma_free_coherent(priv->dev,
-			  MAX_NUM_RX_RING_BYTES,
-			  desc->prx_ring,
-			  desc->pphys_rx_ring);
-	desc->prx_ring = NULL;
-	return rc;
 }
 
 static void pcie_rx_set_buff(struct pcie_priv *pcie_priv,
@@ -185,16 +172,9 @@ static void pcie_rx_ring_free(struct mwl_priv *priv)
 
 	if (desc->prx_ring) {
 		pcie_rx_ring_cleanup(priv);
-
-		dma_free_coherent(priv->dev,
-				  MAX_NUM_RX_RING_BYTES,
-				  desc->prx_ring,
-				  desc->pphys_rx_ring);
-
 		desc->prx_ring = NULL;
 	}
 
-	kfree(desc->rx_hndl);
 	desc->rx_hndl = NULL;
 
 	desc->pnext_rx_hndl = NULL;

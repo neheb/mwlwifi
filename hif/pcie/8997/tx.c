@@ -89,10 +89,10 @@ static int pcie_txbd_ring_create(struct mwl_priv *priv)
 	wiphy_info(priv->hw->wiphy, "TX ring: allocating %d bytes\n",
 		   pcie_priv->txbd_ring_size);
 
-	mem = dma_alloc_coherent(priv->dev,
-				 pcie_priv->txbd_ring_size,
-				 &pcie_priv->txbd_ring_pbase,
-				 GFP_KERNEL);
+	mem = dmam_alloc_coherent(priv->dev,
+				  pcie_priv->txbd_ring_size,
+				  &pcie_priv->txbd_ring_pbase,
+				  GFP_KERNEL);
 
 	if (!mem) {
 		wiphy_err(priv->hw->wiphy, "cannot alloc mem\n");
@@ -168,13 +168,7 @@ static void pcie_txbd_ring_delete(struct mwl_priv *priv)
 		pcie_priv->txbd_ring[num] = NULL;
 	}
 
-	if (pcie_priv->txbd_ring_vbase) {
-		dma_free_coherent(priv->dev,
-				  pcie_priv->txbd_ring_size,
-				  pcie_priv->txbd_ring_vbase,
-				  pcie_priv->txbd_ring_pbase);
-	}
-
+	/* The ring memory is freed when the device detaches. */
 	pcie_priv->txbd_wrptr = 0;
 	pcie_priv->txbd_rdptr = 0;
 	pcie_priv->txbd_ring_size = 0;
