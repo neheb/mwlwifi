@@ -1202,16 +1202,14 @@ static void pcie_rx_account(struct mwl_priv *priv,
 	u32 sig1, sig2, rate, param;
 	u16 format, nss, bw, gi, rate_mcs;
 
-	sig1 = (le32_to_cpu(acnt_rx->rx_info.ht_sig1) >>
-		RXINFO_HT_SIG1_SHIFT) & RXINFO_HT_SIG1_MASK;
-	sig2 = (le32_to_cpu(acnt_rx->rx_info.ht_sig2_rate) >>
-		RXINFO_HT_SIG2_SHIFT) & RXINFO_HT_SIG2_MASK;
-	rate = (le32_to_cpu(acnt_rx->rx_info.ht_sig2_rate) >>
-		RXINFO_RATE_SHIFT) & RXINFO_RATE_MASK;
-	param = (le32_to_cpu(acnt_rx->rx_info.param) >>
-		RXINFO_PARAM_SHIFT) & RXINFO_PARAM_MASK;
+	sig1 = FIELD_GET(RXINFO_HT_SIG1, le32_to_cpu(acnt_rx->rx_info.ht_sig1));
+	sig2 = FIELD_GET(RXINFO_HT_SIG2,
+			 le32_to_cpu(acnt_rx->rx_info.ht_sig2_rate));
+	rate = FIELD_GET(RXINFO_RATE,
+			 le32_to_cpu(acnt_rx->rx_info.ht_sig2_rate));
+	param = FIELD_GET(RXINFO_PARAM, le32_to_cpu(acnt_rx->rx_info.param));
 
-	format = (param >> 3) & 0x7;
+	format = FIELD_GET(RXINFO_PARAM_FORMAT, param);
 	nss = 0;
 	bw = RX_RATE_INFO_HT20;
 	switch (format) {
@@ -1237,23 +1235,23 @@ static void pcie_rx_account(struct mwl_priv *priv,
 			return;
 		break;
 	case RX_RATE_INFO_FORMAT_11N:
-		if ((sig1 & 0x3f) >= 16)
+		if (FIELD_GET(HT_SIG1_MCS, sig1) >= 16)
 			return;
-		bw = (sig1 >> 7) & 0x1;
-		gi = (sig2 >> 7) & 0x1;
-		rate_mcs = sig1 & 0x3F;
+		bw = FIELD_GET(HT_SIG1_CBW, sig1);
+		gi = FIELD_GET(HT_SIG2_SGI, sig2);
+		rate_mcs = FIELD_GET(HT_SIG1_MCS, sig1);
 		if (rate_mcs > 76)
 			return;
 		break;
 	case RX_RATE_INFO_FORMAT_11AC:
-		if (((sig2 >> 4) & 0xf) >= 10)
+		if (FIELD_GET(VHT_SIG2_MCS, sig2) >= 10)
 			return;
-		nss = (sig1 >> 10) & 0x3;
+		nss = FIELD_GET(VHT_SIG1_NSS, sig1);
 		if (!nss)
 			return;
-		bw = sig1 & 0x3;
-		gi = sig2 & 0x1;
-		rate_mcs = (sig2 >> 4) & 0xF;
+		bw = FIELD_GET(VHT_SIG1_BW, sig1);
+		gi = FIELD_GET(VHT_SIG2_SGI, sig2);
+		rate_mcs = FIELD_GET(VHT_SIG2_MCS, sig2);
 		if (rate_mcs > 9)
 			return;
 		break;
@@ -1266,8 +1264,8 @@ static void pcie_rx_account(struct mwl_priv *priv,
 	sta_info->rx_bw = bw;
 	sta_info->rx_gi = gi;
 	sta_info->rx_rate_mcs = rate_mcs;
-	sta_info->rx_signal = ((le32_to_cpu(acnt_rx->rx_info.rssi_x) >>
-		RXINFO_RSSI_X_SHIFT) & RXINFO_RSSI_X_MASK);
+	sta_info->rx_signal = FIELD_GET(RXINFO_RSSI_X,
+					le32_to_cpu(acnt_rx->rx_info.rssi_x));
 }
 
 static void pcie_tx_per(struct mwl_priv *priv, struct mwl_sta *sta_info,
@@ -1528,14 +1526,14 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 			break;
 		case ACNT_CODE_RX_PPDU:
 			acnt_rx = (struct acnt_rx_s *)pstart;
-			nf_a = (le32_to_cpu(acnt_rx->rx_info.nf_a_b) >>
-				RXINFO_NF_A_SHIFT) & RXINFO_NF_A_MASK;
-			nf_b = (le32_to_cpu(acnt_rx->rx_info.nf_a_b) >>
-				RXINFO_NF_B_SHIFT) & RXINFO_NF_B_MASK;
-			nf_c = (le32_to_cpu(acnt_rx->rx_info.nf_c_d) >>
-				RXINFO_NF_C_SHIFT) & RXINFO_NF_C_MASK;
-			nf_d = (le32_to_cpu(acnt_rx->rx_info.nf_c_d) >>
-				RXINFO_NF_D_SHIFT) & RXINFO_NF_D_MASK;
+			nf_a = FIELD_GET(RXINFO_NF_A,
+					 le32_to_cpu(acnt_rx->rx_info.nf_a_b));
+			nf_b = FIELD_GET(RXINFO_NF_B,
+					 le32_to_cpu(acnt_rx->rx_info.nf_a_b));
+			nf_c = FIELD_GET(RXINFO_NF_C,
+					 le32_to_cpu(acnt_rx->rx_info.nf_c_d));
+			nf_d = FIELD_GET(RXINFO_NF_D,
+					 le32_to_cpu(acnt_rx->rx_info.nf_c_d));
 			if ((nf_a >= 2048) && (nf_b >= 2048) &&
 			    (nf_c >= 2048) && (nf_d >= 2048)) {
 				nf_a = ((4096 - nf_a) >> 4);

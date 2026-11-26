@@ -22,6 +22,7 @@
 #include <linux/pci.h>
 #include <linux/firmware.h>
 #include <linux/delay.h>
+#include <linux/bitfield.h>
 #include <linux/bitops.h>
 #include <net/mac80211.h>
 #include <net/page_pool/helpers.h>
@@ -433,24 +434,27 @@ enum { /* Type of Key */
 	KEY_TYPE_GCMP256,   /* GCMP with 256 bit Key + 16 byte MIC    */
 };
 
-#define RXINFO_RSSI_X_SHIFT     24
-#define RXINFO_RSSI_X_MASK      0xFF
-#define RXINFO_HT_SIG1_SHIFT    0
-#define RXINFO_HT_SIG1_MASK     0xFFFFFF
-#define RXINFO_HT_SIG2_SHIFT    0
-#define RXINFO_HT_SIG2_MASK     0x3FFFF
-#define RXINFO_RATE_SHIFT       24
-#define RXINFO_RATE_MASK        0xFF
-#define RXINFO_NF_A_SHIFT       12
-#define RXINFO_NF_A_MASK        0xFFF
-#define RXINFO_NF_B_SHIFT       0
-#define RXINFO_NF_B_MASK        0xFFF
-#define RXINFO_NF_C_SHIFT       12
-#define RXINFO_NF_C_MASK        0xFFF
-#define RXINFO_NF_D_SHIFT       0
-#define RXINFO_NF_D_MASK        0xFFF
-#define RXINFO_PARAM_SHIFT      0
-#define RXINFO_PARAM_MASK       0xFFFFFF
+#define RXINFO_RSSI_X           GENMASK(31, 24)
+#define RXINFO_HT_SIG1          GENMASK(23, 0)
+#define RXINFO_HT_SIG2          GENMASK(17, 0)
+#define RXINFO_RATE             GENMASK(31, 24)
+#define RXINFO_NF_A             GENMASK(23, 12)
+#define RXINFO_NF_B             GENMASK(11, 0)
+#define RXINFO_NF_C             GENMASK(23, 12)
+#define RXINFO_NF_D             GENMASK(11, 0)
+#define RXINFO_PARAM            GENMASK(23, 0)
+
+/* Fields of rx_info.param */
+#define RXINFO_PARAM_FORMAT     GENMASK(5, 3)
+
+/* Fields of the HT-SIG/VHT-SIG-A words in rx_info */
+#define HT_SIG1_MCS             GENMASK(5, 0)
+#define HT_SIG1_CBW             BIT(7)
+#define HT_SIG2_SGI             BIT(7)
+#define VHT_SIG1_BW             GENMASK(1, 0)
+#define VHT_SIG1_NSS            GENMASK(11, 10)
+#define VHT_SIG2_SGI            BIT(0)
+#define VHT_SIG2_MCS            GENMASK(7, 4)
 
 struct rx_info { /* HW Rx buffer */
 	__le32 reserved0[2];

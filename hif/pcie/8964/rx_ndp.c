@@ -585,9 +585,8 @@ int pcie_rx_poll_ndp(struct napi_struct *napi, int budget)
 			if (pktlen <= desc->rx_buf_size) {
 				skb_put(psk_buff, pktlen);
 				skb_pull(psk_buff, sizeof(*rx_info));
-				signal = ((le32_to_cpu(rx_info->rssi_x) >>
-					RXINFO_RSSI_X_SHIFT) &
-					RXINFO_RSSI_X_MASK);
+				signal = FIELD_GET(RXINFO_RSSI_X,
+						   le32_to_cpu(rx_info->rssi_x));
 				pcie_rx_process_slow_data(priv, psk_buff,
 							  bad_mic, signal);
 			} else {
