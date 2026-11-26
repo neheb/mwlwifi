@@ -356,6 +356,12 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 	priv = hw->priv;
 
 	if (priv->forbidden_setting) {
+		/* The firmware keeps its own power table either way, but a
+		 * region code missing from regmap[] gives no country to
+		 * hint.
+		 */
+		if (!priv->fw_alpha2[0])
+			return;
 		if (!priv->regulatory_set) {
 			regulatory_hint(wiphy, priv->fw_alpha2);
 			priv->regulatory_set = true;
@@ -521,8 +527,12 @@ static void mwl_regd_init(struct mwl_priv *priv)
 	for (i = 0; i < ARRAY_SIZE(regmap); i++)
 		if (regmap[i].region_code == priv->fw_region_code) {
 			memcpy(priv->fw_alpha2, regmap[i].alpha2, 2);
-			break;
+			return;
 		}
+
+	wiphy_info(priv->hw->wiphy,
+		   "unknown firmware region code 0x%x, no regulatory hint\n",
+		   priv->fw_region_code);
 }
 
 static void mwl_set_ht_caps(struct mwl_priv *priv,
