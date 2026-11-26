@@ -96,15 +96,15 @@ static void _dump_tx_hist_mu(char *p, int size, int *len, bool *printed,
 	u32 cnt, rateinfo, per0, per1, per2, per3, per4, ratemask;
 
 	tx_hist_data = &sta_info->tx_hist.mu_rate[nss][bw][sgi][mcs];
-	cnt = le32_to_cpu(tx_hist_data->cnt);
-	rateinfo = le32_to_cpu(tx_hist_data->rateinfo);
+	cnt = tx_hist_data->cnt;
+	rateinfo = tx_hist_data->rateinfo;
 	if (cnt && (rateinfo > 0)) {
 		*total += cnt;
-		per4 = le32_to_cpu(tx_hist_data->per[4]);
-		per3 = le32_to_cpu(tx_hist_data->per[3]);
-		per2 = le32_to_cpu(tx_hist_data->per[2]);
-		per1 = le32_to_cpu(tx_hist_data->per[1]);
-		per0 = le32_to_cpu(tx_hist_data->per[0]);
+		per4 = tx_hist_data->per[4];
+		per3 = tx_hist_data->per[3];
+		per2 = tx_hist_data->per[2];
+		per1 = tx_hist_data->per[1];
+		per0 = tx_hist_data->per[0];
 		if (!*printed) {
 			*len += scnprintf(p + *len, size - *len,
 				"%s %26s  <%2d %8s%2d%8s%2d%8s%2d%8s%2d\n",
@@ -178,15 +178,15 @@ static void dump_tx_hist_su(char *p, int size, int *len, bool su, bool *printed,
 	}
 
 	for (j = 0; j < loopcnt; j++) {
-		cnt = le32_to_cpu(tx_hist_data[j].cnt);
-		rateinfo = le32_to_cpu(tx_hist_data[j].rateinfo);
+		cnt = tx_hist_data[j].cnt;
+		rateinfo = tx_hist_data[j].rateinfo;
 		if (cnt && (rateinfo > 0)) {
 			*total += cnt;
-			per4 = le32_to_cpu(tx_hist_data[j].per[4]);
-			per3 = le32_to_cpu(tx_hist_data[j].per[3]);
-			per2 = le32_to_cpu(tx_hist_data[j].per[2]);
-			per1 = le32_to_cpu(tx_hist_data[j].per[1]);
-			per0 = le32_to_cpu(tx_hist_data[j].per[0]);
+			per4 = tx_hist_data[j].per[4];
+			per3 = tx_hist_data[j].per[3];
+			per2 = tx_hist_data[j].per[2];
+			per1 = tx_hist_data[j].per[1];
+			per0 = tx_hist_data[j].per[0];
 			if (!*printed) {
 				*len += scnprintf(p + *len, size - *len,
 				"%s %26s  <%2d %8s%2d%8s%2d%8s%2d%8s%2d\n",
@@ -238,17 +238,19 @@ static void dump_tx_hist_su(char *p, int size, int *len, bool su, bool *printed,
 					mcs, cnt, per0, per1, per2, per3, per4);
 				}
 			} else if (format ==  TX_RATE_FORMAT_11N) {
-				sprintf(title_str, "%4s_%3s_MCS%2d	    :",
-					bw_str[bw], sgi_str[sgi], mcs);
+				scnprintf(title_str, sizeof(title_str),
+					  "%4s_%3s_MCS%2d	    :",
+					  bw_str[bw], sgi_str[sgi], mcs);
 				*len += scnprintf(p + *len, size - *len,
 					"%s %10u, %9d, %9d, %9d, %9d, %9d\n",
 					title_str, cnt, per0, per1, per2, per3,
 					per4);
 			} else {
 				nss = (mcs >> 4);
-				sprintf(title_str, "%5s_%3s_%1dSS_MCS%2d :",
-					bw_str[bw], sgi_str[sgi], (nss+1),
-					(mcs & 0xf));
+				scnprintf(title_str, sizeof(title_str),
+					  "%5s_%3s_%1dSS_MCS%2d :",
+					  bw_str[bw], sgi_str[sgi], (nss + 1),
+					  (mcs & 0xf));
 				*len += scnprintf(p + *len, size - *len,
 					"%s %10u, %9d, %9d, %9d, %9d, %9d\n",
 					title_str, cnt, per0, per1, per2, per3,
