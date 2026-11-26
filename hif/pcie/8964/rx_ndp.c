@@ -543,9 +543,9 @@ int pcie_rx_poll_ndp(struct napi_struct *napi, int budget)
 				pcie_rx_process_fast_data(priv, psk_buff,
 							  stnid);
 			} else {
-				wiphy_err(hw->wiphy,
-					  "fast: space %d(%d) is not enough\n",
-					  desc->rx_buf_size, pktlen);
+				wiphy_err_ratelimited(hw->wiphy,
+						      "fast: space %d(%d) is not enough\n",
+						      desc->rx_buf_size, pktlen);
 				dev_kfree_skb_any(psk_buff);
 			}
 			break;
@@ -588,15 +588,16 @@ int pcie_rx_poll_ndp(struct napi_struct *napi, int budget)
 				pcie_rx_process_slow_data(priv, psk_buff,
 							  bad_mic, signal);
 			} else {
-				wiphy_err(hw->wiphy,
-					  "slow: space %d(%d) is not enough\n",
-					  desc->rx_buf_size, pktlen);
+				wiphy_err_ratelimited(hw->wiphy,
+						      "slow: space %d(%d) is not enough\n",
+						      desc->rx_buf_size, pktlen);
 				dev_kfree_skb_any(psk_buff);
 			}
 			break;
 		default:
-			wiphy_err(hw->wiphy, "unknown control case: %d\n",
-				  ctrl_case);
+			wiphy_err_ratelimited(hw->wiphy,
+					      "unknown control case: %d\n",
+					      ctrl_case);
 			dev_kfree_skb_any(psk_buff);
 			break;
 		}

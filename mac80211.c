@@ -95,8 +95,8 @@ static void mwl_mac80211_tx(struct ieee80211_hw *hw,
 	struct mwl_priv *priv = hw->priv;
 
 	if (!priv->radio_on) {
-		wiphy_warn(hw->wiphy,
-			   "dropped TX frame since radio is disabled\n");
+		wiphy_warn_ratelimited(hw->wiphy,
+				       "dropped TX frame since radio is disabled\n");
 		ieee80211_free_txskb(hw, skb);
 		return;
 	}

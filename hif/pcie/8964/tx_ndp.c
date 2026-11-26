@@ -329,8 +329,8 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 			     tx_skb->len, DMA_TO_DEVICE);
 	if (dma_mapping_error(&(pcie_priv->pdev)->dev, dma)) {
 		ieee80211_free_txskb(priv->hw, tx_skb);
-		wiphy_err(priv->hw->wiphy,
-			  "failed to map pci memory!\n");
+		wiphy_err_ratelimited(priv->hw->wiphy,
+				      "failed to map pci memory!\n");
 		return -EIO;
 	}
 
@@ -339,7 +339,7 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 		dma_unmap_single(&(pcie_priv->pdev)->dev, dma, tx_skb->len,
 				 DMA_TO_DEVICE);
 		ieee80211_free_txskb(priv->hw, tx_skb);
-		wiphy_err(priv->hw->wiphy, "no free TX buffer slot\n");
+		wiphy_err_ratelimited(priv->hw->wiphy, "no free TX buffer slot\n");
 		return -ENOSPC;
 	}
 	pnext_tx_desc->data = cpu_to_le32(dma);
@@ -594,11 +594,11 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 		 * eventually stops for good.
 		 */
 		if (index >= MAX_TX_RING_SEND_SIZE) {
-			wiphy_err(hw->wiphy,
-				  "corruption for index of buffer\n");
+			wiphy_err_ratelimited(hw->wiphy,
+					      "corruption for index of buffer\n");
 		} else if (!desc->tx_vbuflist[index]) {
-			wiphy_err(hw->wiphy,
-				  "buffer is NULL for tx done ring\n");
+			wiphy_err_ratelimited(hw->wiphy,
+					      "buffer is NULL for tx done ring\n");
 		} else {
 			pcie_tx_return_skb_ndp(hw, index, false);
 		}
@@ -757,8 +757,8 @@ static int pcie_tx_prepare_ndp(struct ieee80211_hw *hw,
 			stream = mwl_fwcmd_lookup_stream(hw, sta, tid);
 			if (!stream ||
 			    stream->state == AMPDU_STREAM_IN_PROGRESS) {
-				wiphy_warn(hw->wiphy,
-					   "can't send packet during ADDBA\n");
+				wiphy_warn_ratelimited(hw->wiphy,
+						       "can't send packet during ADDBA\n");
 				spin_unlock_bh(&priv->stream_lock);
 				ieee80211_free_txskb(hw, skb);
 				return -1;

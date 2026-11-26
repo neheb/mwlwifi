@@ -287,8 +287,8 @@ static inline void pcie_tx_skb(struct mwl_priv *priv, int desc_num,
 	dma = dma_map_single(&(pcie_priv->pdev)->dev, tx_skb->data,
 			     tx_skb->len, DMA_TO_DEVICE);
 	if (dma_mapping_error(&(pcie_priv->pdev)->dev, dma)) {
-		wiphy_err(priv->hw->wiphy,
-			  "failed to map pci memory!\n");
+		wiphy_err_ratelimited(priv->hw->wiphy,
+				      "failed to map pci memory!\n");
 		pcie_tx_remove_dma_header(tx_skb, tx_desc->qos_ctrl);
 		ieee80211_free_txskb(priv->hw, tx_skb);
 		return;
@@ -773,8 +773,8 @@ void pcie_8864_tx_xmit(struct ieee80211_hw *hw,
 				 * mac80211 queues our packets for us in this
 				 * case, so this is really just a safety check.
 				 */
-				wiphy_warn(hw->wiphy,
-					   "can't send packet during ADDBA\n");
+				wiphy_warn_ratelimited(hw->wiphy,
+						       "can't send packet during ADDBA\n");
 				spin_unlock_bh(&priv->stream_lock);
 				ieee80211_free_txskb(hw, skb);
 				return;
