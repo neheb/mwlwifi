@@ -20,6 +20,7 @@
 #include <linux/etherdevice.h>
 
 #include "sysadpt.h"
+#include "compat.h"
 #include "core.h"
 #include "utils.h"
 #include "thermal.h"
