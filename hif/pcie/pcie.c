@@ -17,6 +17,7 @@
 
 #include <linux/module.h>
 #include <linux/etherdevice.h>
+#include <linux/iopoll.h>
 
 #include "sysadpt.h"
 #include "compat.h"
@@ -34,7 +35,8 @@
 
 #define PCIE_DRV_DESC "Marvell Mac80211 Wireless PCIE Network Driver"
 
-#define MAX_WAIT_FW_COMPLETE_ITERATIONS 10000
+#define FW_CMD_POLL_US                  50
+#define FW_CMD_TIMEOUT_US               (10 * USEC_PER_SEC)
 #define CHECK_BA_TRAFFIC_TIME           HZ  /* 1 sec */
 #define CHECK_TX_DONE_TIME              50  /* msec */
 
@@ -164,14 +166,18 @@ static void pcie_send_cmd(struct pcie_priv *pcie_priv)
 
 static int pcie_wait_complete(struct mwl_priv *priv, unsigned short cmd)
 {
-	unsigned int curr_iteration = MAX_WAIT_FW_COMPLETE_ITERATIONS;
-	unsigned short int_code = 0;
 	__le16 *pcmd = priv->pcmd_buf;
+	u16 int_code;
 
-	do {
-		int_code = le16_to_cpu(pcmd[0]);
-		usleep_range(1000, 2000);
-	} while ((int_code != cmd) && (--curr_iteration) && !priv->rmmod);
+	/* The firmware writes the response code over the command code.
+	 * Most commands take well under a millisecond, so poll finely.
+	 */
+	read_poll_timeout(le16_to_cpu, int_code,
+			  int_code == cmd || READ_ONCE(priv->rmmod),
+			  FW_CMD_POLL_US, FW_CMD_TIMEOUT_US, false,
+			  READ_ONCE(pcmd[0]));
+	/* Read the response only after its code. */
+	dma_rmb();
 
 	if (int_code != cmd) {
 		if (priv->rmmod)
@@ -182,6 +188,10 @@ static int pcie_wait_complete(struct mwl_priv *priv, unsigned short cmd)
 		return -EIO;
 	}
 
+	/* The firmware can post the response before it is ready for the
+	 * next command: without this, the 88W8964 misses a SET_SPECTRUM_MGMT
+	 * doorbell right after AP_BEACON.
+	 */
 	if (priv->chip_type != MWL8997)
 		usleep_range(3000, 5000);
 
