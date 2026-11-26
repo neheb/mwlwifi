@@ -1055,6 +1055,10 @@ static void pcie_tx_account(struct mwl_priv *priv,
 	if (!tx_hist || (type >= SU_MU_TYPE_CNT))
 		return;
 
+	if ((type == SU_MIMO) && (index >= MAX_SUPPORTED_RATES) &&
+	    (index != 0xFF))
+		return;
+
 	format = FIELD_GET(MWL_TX_RATE_FORMAT_MASK, rate_info);
 	bw = FIELD_GET(MWL_TX_RATE_BANDWIDTH_MASK, rate_info);
 	gi = FIELD_GET(MWL_TX_RATE_SHORTGI_MASK, rate_info);
@@ -1067,7 +1071,8 @@ static void pcie_tx_account(struct mwl_priv *priv,
 		if (type == MU_MIMO) {
 			rate_ac = mcs & 0xf;
 			nss = mcs >> 4;
-			if (nss < (QS_NUM_SUPPORTED_11AC_NSS - 1)) {
+			if (nss < (QS_NUM_SUPPORTED_11AC_NSS - 1) &&
+			    rate_ac < QS_NUM_SUPPORTED_11AC_MCS) {
 				tx_hist_data =
 					&tx_hist->mu_rate[nss][bw][gi][rate_ac];
 				tx_hist_data->rateinfo = rate_info;
@@ -1091,7 +1096,8 @@ static void pcie_tx_account(struct mwl_priv *priv,
 		if (type == MU_MIMO) {
 			rate_ac = mcs & 0xf;
 			nss = mcs >> 4;
-			if (nss < (QS_NUM_SUPPORTED_11AC_NSS - 1)) {
+			if (nss < (QS_NUM_SUPPORTED_11AC_NSS - 1) &&
+			    rate_ac < QS_NUM_SUPPORTED_11AC_MCS) {
 				tx_hist_data =
 					&tx_hist->mu_rate[nss][bw][gi][rate_ac];
 				tx_hist_data->rateinfo = rate_info;
@@ -1246,7 +1252,8 @@ static void pcie_tx_per(struct mwl_priv *priv, struct mwl_sta *sta_info,
 		if (type == MU_MIMO) {
 			rate_ac = mcs & 0xf;
 			nss = mcs >> 4;
-			if (nss < (QS_NUM_SUPPORTED_11AC_NSS - 1)) {
+			if (nss < (QS_NUM_SUPPORTED_11AC_NSS - 1) &&
+			    rate_ac < QS_NUM_SUPPORTED_11AC_MCS) {
 				tx_hist_data =
 					&tx_hist->mu_rate[nss][bw][gi][rate_ac];
 				tx_hist_data->rateinfo = rate_info;
@@ -1267,7 +1274,8 @@ static void pcie_tx_per(struct mwl_priv *priv, struct mwl_sta *sta_info,
 		if (type == MU_MIMO) {
 			rate_ac = mcs & 0xf;
 			nss = mcs >> 4;
-			if (nss < (QS_NUM_SUPPORTED_11AC_NSS - 1)) {
+			if (nss < (QS_NUM_SUPPORTED_11AC_NSS - 1) &&
+			    rate_ac < QS_NUM_SUPPORTED_11AC_MCS) {
 				tx_hist_data =
 					&tx_hist->mu_rate[nss][bw][gi][rate_ac];
 				tx_hist_data->rateinfo = rate_info;
