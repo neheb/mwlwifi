@@ -16,7 +16,6 @@ mwlwifi-objs			+= hif/pcie/8964/tx_ndp.o
 mwlwifi-objs			+= hif/pcie/8964/rx_ndp.o
 
 ccflags-y += -I$(src)
-ccflags-y += -O2 -funroll-loops -D__CHECK_ENDIAN__
 
 all:
 	$(MAKE) -C $(KDIR) M=$(PWD)
