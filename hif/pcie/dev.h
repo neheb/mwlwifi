@@ -18,6 +18,7 @@
 #ifndef _DEV_H_
 #define _DEV_H_
 
+#include <linux/hrtimer.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/firmware.h>
@@ -276,6 +277,7 @@ struct pcie_dma_data {
 #define MAX_AGGR_SIZE          SKB_MAX_ORDER(RX_HEADROOM_NDP, 0)
 #define TX_QUEUE_LIMIT         MAX_NUM_TX_DESC
 #define TX_WAKE_Q_THRESHOLD    (MAX_NUM_TX_DESC - 256)
+#define TX_POLL_US             1000 /* TX done ring poll while busy */
 
 /* RateCode usage notes:
  * * General
@@ -603,6 +605,11 @@ struct pcie_priv {
 	struct pcie_desc_data_ndp desc_data_ndp;
 	int tx_done_cnt;
 	int tx_done_timer_cnt;
+	/* 88W8964: the firmware raises no interrupt for TX completions,
+	 * so the TX done ring is polled while frames are in flight.
+	 */
+	struct hrtimer tx_poll_timer;
+	u32 tx_poll_us;
 	struct ieee80211_sta *sta_link[SYSADPT_MAX_STA_SC4 + 1];
 	struct ndp_rx_counter rx_cnts;
 	u32 recheck_rxringdone;
@@ -1065,6 +1072,16 @@ static inline struct sk_buff *pcie_rx_build_skb(struct page_pool *pool,
 static inline void pcie_schedule_tx(struct pcie_priv *pcie_priv)
 {
 	queue_work(system_bh_wq, &pcie_priv->tx_work);
+}
+
+/* Poll the TX done ring of the 88W8964 again in tx_poll_us. */
+static inline void pcie_arm_tx_poll(struct pcie_priv *pcie_priv)
+{
+	if (pcie_priv->tx_poll_us &&
+	    !hrtimer_active(&pcie_priv->tx_poll_timer))
+		hrtimer_start(&pcie_priv->tx_poll_timer,
+			      us_to_ktime(pcie_priv->tx_poll_us),
+			      HRTIMER_MODE_REL);
 }
 
 static inline void pcie_mask_int(struct pcie_priv *pcie_priv,

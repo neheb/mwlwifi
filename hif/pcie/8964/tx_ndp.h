@@ -22,6 +22,7 @@
 int pcie_tx_init_ndp(struct ieee80211_hw *hw);
 void pcie_tx_deinit_ndp(struct ieee80211_hw *hw);
 void pcie_tx_skbs_ndp(struct work_struct *work);
+bool pcie_tx_pending_ndp(struct pcie_priv *pcie_priv);
 void pcie_tx_done_ndp(struct ieee80211_hw *hw);
 void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 		      struct ieee80211_tx_control *control,

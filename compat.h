@@ -7,8 +7,24 @@
 #ifndef _MWL_COMPAT_H_
 #define _MWL_COMPAT_H_
 
+#include <linux/hrtimer.h>
 #include <linux/slab.h>
 #include <linux/version.h>
+
+/* hrtimer_setup() replaced hrtimer_init() in 6.13. mac80211 backports
+ * provide hrtimer_setup() for older kernels too, so use another name.
+ */
+static inline void mwl_hrtimer_setup(struct hrtimer *timer,
+				     enum hrtimer_restart (*function)(struct hrtimer *),
+				     clockid_t clock_id, enum hrtimer_mode mode)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0)
+	hrtimer_init(timer, clock_id, mode);
+	timer->function = function;
+#else
+	hrtimer_setup(timer, function, clock_id, mode);
+#endif
+}
 
 /* kmalloc_obj() and kzalloc_obj() appeared in 7.0 (OpenWrt also carries
  * them in its 6.12 tree); only the form with the default GFP_KERNEL is

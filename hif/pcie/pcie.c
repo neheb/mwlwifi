@@ -19,6 +19,7 @@
 #include <linux/etherdevice.h>
 
 #include "sysadpt.h"
+#include "compat.h"
 #include "core.h"
 #include "utils.h"
 #include "hif/fwcmd.h"
@@ -763,6 +764,16 @@ static struct mwl_hif_ops pcie_hif_ops_8864 = {
 	.get_survey            = pcie_get_survey,
 };
 
+static enum hrtimer_restart pcie_tx_poll_timer_ndp(struct hrtimer *timer)
+{
+	struct pcie_priv *pcie_priv = container_of(timer, struct pcie_priv,
+						   tx_poll_timer);
+
+	/* The NAPI poll reaps the TX done ring. */
+	napi_schedule(&pcie_priv->napi);
+	return HRTIMER_NORESTART;
+}
+
 static int pcie_init_ndp(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
@@ -776,6 +787,9 @@ static int pcie_init_ndp(struct ieee80211_hw *hw)
 	/* The TX work stays disabled until the radio is started. */
 	INIT_WORK(&pcie_priv->tx_work, pcie_tx_skbs_ndp);
 	disable_work(&pcie_priv->tx_work);
+	mwl_hrtimer_setup(&pcie_priv->tx_poll_timer, pcie_tx_poll_timer_ndp,
+			  CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	pcie_priv->tx_poll_us = TX_POLL_US;
 	spin_lock_init(&pcie_priv->tx_desc_lock);
 	pcie_priv->napi_dev = alloc_netdev_dummy(0);
 	if (!pcie_priv->napi_dev)
@@ -861,6 +875,7 @@ static void pcie_deinit_ndp(struct ieee80211_hw *hw)
 	pcie_reset(hw);
 
 	disable_work_sync(&pcie_priv->tx_work);
+	hrtimer_cancel(&pcie_priv->tx_poll_timer);
 
 	pcie_rx_deinit_ndp(hw);
 	pcie_tx_deinit_ndp(hw);
@@ -973,6 +988,7 @@ static void pcie_disable_data_tasks_ndp(struct ieee80211_hw *hw)
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 
 	disable_work_sync(&pcie_priv->tx_work);
+	hrtimer_cancel(&pcie_priv->tx_poll_timer);
 	napi_synchronize(&pcie_priv->napi);
 	napi_disable(&pcie_priv->napi);
 }
@@ -1035,14 +1051,9 @@ static void pcie_timer_routine_ndp(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
-	int num = SYSADPT_TX_WMM_QUEUES;
 
-	while (num--) {
-		if (skb_queue_len(&pcie_priv->txq[num]) > 0) {
-			pcie_schedule_tx(pcie_priv);
-			break;
-		}
-	}
+	if (pcie_tx_pending_ndp(pcie_priv))
+		pcie_schedule_tx(pcie_priv);
 
 	if ((++pcie_priv->tx_done_timer_cnt * SYSADPT_TIMER_WAKEUP_TIME) >=
 	    CHECK_TX_DONE_TIME) {

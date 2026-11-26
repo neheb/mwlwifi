@@ -25,6 +25,7 @@
 #include "utils.h"
 #include "hif/pcie/dev.h"
 #include "hif/pcie/8964/rx_ndp.h"
+#include "hif/pcie/8964/tx_ndp.h"
 
 #define MAX_NUM_RX_RING_BYTES   (MAX_NUM_RX_DESC * \
 				sizeof(struct pcie_rx_desc_ndp))
@@ -614,6 +615,18 @@ done:
 	/* Keep polling for an entry the firmware hasn't finished. */
 	if (pending)
 		return budget;
+
+	/* Reap TX completions here too: the firmware raises no interrupt
+	 * for them. Refill the TX ring if frames are waiting, and poll
+	 * again while frames are in flight.
+	 */
+	if (pcie_priv->desc_data_ndp.tx_desc_busy_cnt) {
+		pcie_tx_done_ndp(hw);
+		if (pcie_tx_pending_ndp(pcie_priv))
+			pcie_schedule_tx(pcie_priv);
+		if (pcie_priv->desc_data_ndp.tx_desc_busy_cnt)
+			pcie_arm_tx_poll(pcie_priv);
+	}
 
 	if (rx_cnt < budget && napi_complete_done(napi, rx_cnt))
 		pcie_mask_int(pcie_priv, MACREG_A2HRIC_RX_DONE_HEAD_RDY, true);

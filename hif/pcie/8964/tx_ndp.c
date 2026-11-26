@@ -472,7 +472,9 @@ void pcie_tx_skbs_ndp(struct work_struct *work)
 			if (pcie_priv->desc_data_ndp.tx_desc_busy_cnt >=
 			    (MAX_TX_RING_SEND_SIZE - 1)) {
 				pcie_tx_done_ndp(hw);
-				break;
+				if (pcie_priv->desc_data_ndp.tx_desc_busy_cnt >=
+				    (MAX_TX_RING_SEND_SIZE - 1))
+					break;
 			}
 
 			tx_skb = skb_dequeue(&pcie_priv->txq[num]);
@@ -492,6 +494,9 @@ void pcie_tx_skbs_ndp(struct work_struct *work)
 			}
 		}
 
+		if (pcie_priv->desc_data_ndp.tx_desc_busy_cnt)
+			pcie_arm_tx_poll(pcie_priv);
+
 		if (skb_queue_len(&pcie_priv->txq[num]) <
 		    pcie_priv->txq_wake_threshold) {
 			int queue;
@@ -501,6 +506,16 @@ void pcie_tx_skbs_ndp(struct work_struct *work)
 				ieee80211_wake_queue(hw, queue);
 		}
 	}
+}
+
+bool pcie_tx_pending_ndp(struct pcie_priv *pcie_priv)
+{
+	int num;
+
+	for (num = 0; num < SYSADPT_TX_WMM_QUEUES; num++)
+		if (skb_queue_len(&pcie_priv->txq[num]))
+			return true;
+	return false;
 }
 
 void pcie_tx_done_ndp(struct ieee80211_hw *hw)
