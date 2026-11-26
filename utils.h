@@ -118,22 +118,6 @@ struct mwl_sta *utils_find_sta_by_aid(struct mwl_priv *priv, u16 aid);
 
 struct mwl_sta *utils_find_sta_by_id(struct mwl_priv *priv, u16 stnid);
 
-void utils_dump_data_info(const char *prefix_str, const void *buf, size_t len);
-
 void utils_dump_data_debug(const char *prefix_str, const void *buf, size_t len);
-
-bool utils_is_non_amsdu_packet(const void *packet, bool mac80211);
-
-bool utils_is_arp(const void *packet, bool mac80211, u16 *arp_op);
-
-bool utils_is_icmp_echo(const void *packet, bool mac80211, u8 *type);
-
-bool utils_is_dhcp(const void *packet, bool mac80211, u8 *op, u8 *dhcp_client);
-
-void utils_dump_arp(const void *packet, bool mac80211, size_t len);
-
-void utils_dump_icmp_echo(const void *packet, bool mac80211, size_t len);
-
-void utils_dump_dhcp(const void *packet, bool mac80211, size_t len);
 
 #endif /* _UTILS_H_ */
