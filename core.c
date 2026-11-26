@@ -896,6 +896,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	u16 addr_num;
 	struct mac_address *mac_addr;
 	u8 last_nibble;
+	bool count_up;
 
 	hw->extra_tx_headroom = mwl_hif_get_tx_head_room(hw);
 	hw->queues = SYSADPT_TX_WMM_QUEUES;
@@ -999,18 +1000,19 @@ static int mwl_wl_init(struct mwl_priv *priv)
 		mac_addr = &hw->wiphy->addresses[0];
 		ether_addr_copy(mac_addr->addr, priv->hw_data.mac_addr);
 		last_nibble = mac_addr->addr[5] & 0x0F;
+		/* Boards give the radios consecutive addresses, so have one
+		 * count up and the other down from theirs. Decide by the
+		 * address, not by the wiphy name, which changes when the
+		 * module is reloaded.
+		 */
+		count_up = !(mac_addr->addr[5] & 1);
 		for (addr_num = 0; addr_num < SYSADPT_NUM_OF_AP; addr_num++) {
 			mac_addr = &hw->wiphy->addresses[addr_num + 1];
 			ether_addr_copy(mac_addr->addr, priv->hw_data.mac_addr);
-			if (!strcmp(wiphy_name(hw->wiphy), "phy0")) {
-				last_nibble++;
-				if (last_nibble == 0x10)
-					last_nibble = 0;
-			} else {
-				last_nibble--;
-				if (last_nibble == 0xFF)
-					last_nibble = 0x0F;
-			}
+			if (count_up)
+				last_nibble = (last_nibble + 1) & 0x0F;
+			else
+				last_nibble = (last_nibble - 1) & 0x0F;
 			mac_addr->addr[5] =
 				(mac_addr->addr[5] & 0xF0) | last_nibble;
 			mac_addr->addr[0] |= 0x2;
