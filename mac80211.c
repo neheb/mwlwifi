@@ -184,9 +184,6 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 	u32 macids_supported;
 	int macid;
 
-	if (vif->type == NL80211_IFTYPE_MONITOR)
-		priv->rx_decrypt = true;
-
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
 	case NL80211_IFTYPE_MESH_POINT:
@@ -263,27 +260,6 @@ static void mwl_mac80211_remove_vif(struct mwl_priv *priv,
 	if (!priv->macids_used)
 		return;
 
-	/* mac80211 suppress 1 monitor interface */
-	if (vif->type == NL80211_IFTYPE_MONITOR) {
-		int counter = 0;
-		struct ieee80211_vif *_vif;
-		struct mwl_vif *iter;
-
-		scoped_guard(spinlock_bh, &priv->vif_lock) {
-			list_for_each_entry(iter, &priv->vif_list, list) {
-				_vif = container_of((void *)iter, struct ieee80211_vif,
-						drv_priv);
-
-				if (_vif->type == NL80211_IFTYPE_MONITOR)
-					counter++;
-			}
-		}
-		/* but if existe more than 1,
-		   so 1 interface is still activ*/
-		if (counter <= 1)
-			priv->rx_decrypt = false;
-	}
-
 	mwl_hif_tx_del_pkts_via_vif(priv->hw, vif);
 
 	priv->macids_used &= ~(1 << mwl_vif->macid);
@@ -317,10 +293,17 @@ static void mwl_mac80211_remove_interface(struct ieee80211_hw *hw,
 static int mwl_mac80211_config(struct ieee80211_hw *hw, int radio_idx,
 			       u32 changed)
 {
+	struct mwl_priv *priv = hw->priv;
 	struct ieee80211_conf *conf = &hw->conf;
 	int rc;
 
 	wiphy_debug(hw->wiphy, "change: 0x%x\n", changed);
+
+	/* Copy decrypted frames to monitor interfaces only while there
+	 * are any: it costs a copy of each frame.
+	 */
+	if (changed & IEEE80211_CONF_CHANGE_MONITOR)
+		priv->rx_decrypt = !!(conf->flags & IEEE80211_CONF_MONITOR);
 
 	if (conf->flags & IEEE80211_CONF_IDLE)
 		rc = mwl_fwcmd_radio_disable(hw);
