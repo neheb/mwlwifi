@@ -711,6 +711,7 @@ static int pcie_init_ndp(struct ieee80211_hw *hw)
 		return -ENOMEM;
 	netif_napi_add(pcie_priv->napi_dev, &pcie_priv->napi, pcie_rx_poll_ndp);
 	pcie_priv->tx_inflight_max = TX_INFLIGHT_MAX;
+	pcie_priv->tx_inflight_multi = TX_INFLIGHT_MULTI;
 
 	rc = pcie_tx_init_ndp(hw);
 	if (rc)
@@ -797,6 +798,8 @@ static void pcie_get_info_ndp(struct ieee80211_hw *hw, struct seq_file *s)
 	seq_printf(s, "iobase1: %p\n",
 		   pcie_priv->iobase1);
 	seq_printf(s, "tx inflight max: %u\n", pcie_priv->tx_inflight_max);
+	seq_printf(s, "tx inflight max, several stations: %u\n",
+		   pcie_priv->tx_inflight_multi);
 }
 
 static void pcie_get_tx_status_ndp(struct ieee80211_hw *hw, struct seq_file *s)

@@ -1316,6 +1316,9 @@ void mwl_debugfs_init(struct ieee80211_hw *hw)
 
 		debugfs_create_u32("tx_inflight_max", 0600, priv->debugfs_phy,
 				   &pcie_priv->tx_inflight_max);
+		debugfs_create_u32("tx_inflight_multi", 0600,
+				   priv->debugfs_phy,
+				   &pcie_priv->tx_inflight_multi);
 		debugfs_create_u32("tx_poll_us", 0600, priv->debugfs_phy,
 				   &pcie_priv->tx_poll_us);
 	}

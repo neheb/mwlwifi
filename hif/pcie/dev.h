@@ -284,6 +284,18 @@ struct pcie_dma_data {
  * poll interval are tunable in debugfs.
  */
 #define TX_INFLIGHT_MAX        256
+/* While it serves more than one station, the firmware sends what it holds
+ * in its own order, which dilutes airtime fairness and adds latency. With
+ * an MT7612U and an RT3070 at MCS 1 on 2.4 GHz, the slow station took
+ * 1.6-1.9 times the airtime of the fast one with 256 frames in flight,
+ * 1.3-1.7 times with 128 and the same with 64. With two fast stations on
+ * 5 GHz, 128 cut the ping under load from 14-17 to 10 ms for 2-3% less
+ * throughput, and 64 cost 15%. Hold the firmware to this many frames
+ * while frames for different stations were handed over within the last
+ * TX_MULTI_STA_HOLD; a single station keeps tx_inflight_max.
+ */
+#define TX_INFLIGHT_MULTI      128
+#define TX_MULTI_STA_HOLD      (HZ / 10)
 #define TX_POLL_US             1000 /* TX done ring poll while busy */
 
 /* RateCode usage notes:
@@ -597,6 +609,12 @@ struct pcie_priv {
 	u32 txq_limit;
 	u32 txq_wake_threshold;
 	u32 tx_inflight_max;   /* 88W8964: frames handed to the firmware */
+	u32 tx_inflight_multi; /* the same while serving several stations */
+	/* Only compared, never dereferenced: the station last pulled from,
+	 * and when the one before it was a different station.
+	 */
+	struct ieee80211_sta *tx_last_sta;
+	unsigned long tx_multi_stamp;
 	/* 88W8964: mac80211 may have frames the firmware had no room for */
 	bool tx_txq_waiting;
 	bool is_tx_done_schedule;

@@ -494,6 +494,11 @@ static bool pcie_tx_pull_ndp(struct ieee80211_hw *hw, int num,
 
 	ieee80211_txq_schedule_start(hw, ac);
 	while (room && (txq = ieee80211_next_txq(hw, ac))) {
+		if (txq->sta && txq->sta != pcie_priv->tx_last_sta) {
+			if (pcie_priv->tx_last_sta)
+				pcie_priv->tx_multi_stamp = jiffies;
+			pcie_priv->tx_last_sta = txq->sta;
+		}
 		/* mac80211 requires RCU to be held from dequeueing a frame
 		 * until the driver is done with it: tx_info->control.hw_key
 		 * may be freed once it is dropped.
@@ -517,8 +522,9 @@ static bool pcie_tx_pull_ndp(struct ieee80211_hw *hw, int num,
 }
 
 /* Hand frames to the firmware while fewer than tx_inflight_max are in
- * flight, for each AC from VO to BK: first those in the driver queue,
- * which mac80211 handed over directly, then those in its TXQs.
+ * flight (tx_inflight_multi while it serves several stations), for each
+ * AC from VO to BK: first those in the driver queue, which mac80211 handed
+ * over directly, then those in its TXQs.
  */
 void pcie_tx_skbs_ndp(struct work_struct *work)
 {
@@ -530,7 +536,13 @@ void pcie_tx_skbs_ndp(struct work_struct *work)
 	u32 inflight_max;
 	bool room = true;
 
-	inflight_max = clamp_t(u32, pcie_priv->tx_inflight_max, 1,
+	inflight_max = pcie_priv->tx_inflight_max;
+	/* A range, so that a stamp from long ago can't wrap into it. */
+	if (pcie_priv->tx_last_sta &&
+	    time_in_range_open(jiffies, pcie_priv->tx_multi_stamp,
+			       pcie_priv->tx_multi_stamp + TX_MULTI_STA_HOLD))
+		inflight_max = min(inflight_max, pcie_priv->tx_inflight_multi);
+	inflight_max = clamp_t(u32, inflight_max, 1,
 			       MAX_TX_RING_SEND_SIZE - 1);
 
 	while (room && num--) {
