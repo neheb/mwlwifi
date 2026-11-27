@@ -1409,7 +1409,6 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 				  acnt_head, acnt_tail, read_size);
 			goto process_next;
 		}
-		memset(desc->pacnt_buf, 0, desc->acnt_ring_size);
 		memcpy(desc->pacnt_buf, desc->pacnt_ring + acnt_tail,
 		       desc->acnt_ring_size - acnt_tail);
 		memcpy(desc->pacnt_buf + desc->acnt_ring_size - acnt_tail,

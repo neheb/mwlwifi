@@ -61,7 +61,7 @@ static void mwl_get_rateinfo(struct mwl_priv *priv, u8 *addr,
 	struct mwl_tx_hist_data *tx_hist_data;
 	int ret, idx;
 
-	rate_table = kzalloc(table_size, GFP_KERNEL);
+	rate_table = kmalloc(table_size, GFP_KERNEL);
 	if (!rate_table)
 		return;
 
@@ -215,11 +215,6 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 	memset(mwl_vif, 0, sizeof(*mwl_vif));
 	mwl_vif->type = vif->type;
 	mwl_vif->macid = macid;
-	mwl_vif->seqno = 0;
-	mwl_vif->is_hw_crypto_enabled = false;
-	mwl_vif->beacon_info.valid = false;
-	mwl_vif->set_beacon = false;
-	mwl_vif->basic_rate_idx = 0;
 	mwl_vif->broadcast_ssid = 0xFF;
 
 	/* The commands fail only if the firmware doesn't answer. Don't

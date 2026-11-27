@@ -282,12 +282,10 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 
 	beacon_info = &vif->beacon_info;
 	memset(beacon_info, 0, sizeof(*beacon_info));
-	beacon_info->valid = false;
 	beacon_info->ie_ht_ptr = &beacon_info->ie_list_ht[0];
 	beacon_info->ie_vht_ptr = &beacon_info->ie_list_vht[0];
 
 	beacon_info->cap_info = le16_to_cpu(mgmt->u.beacon.capab_info);
-	beacon_info->power_constraint = 0;
 
 	pos = mgmt->u.beacon.variable;
 	left = len - baselen;
@@ -2783,7 +2781,6 @@ int mwl_fwcmd_get_ratetable(struct ieee80211_hw *hw, u8 *addr, void *rate_table,
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->type = type;
 	ether_addr_copy(pcmd->addr, addr);
-	memset(rate_table, 0x00, size);
 
 	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_GET_RATETABLE))
 		return -EIO;

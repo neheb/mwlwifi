@@ -203,7 +203,6 @@ static int mwl_prepare_cmd_buf(struct mwl_priv *priv)
 	wiphy_debug(priv->hw->wiphy,
 		    "priv->pcmd_buf = %p  priv->pphys_cmd_buf = %pad\n",
 		    priv->pcmd_buf, &priv->pphys_cmd_buf);
-	memset(priv->pcmd_buf, 0x00, MWL_CMD_BUF_SIZE);
 
 	return 0;
 

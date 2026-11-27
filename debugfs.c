@@ -789,7 +789,7 @@ static int mwl_debugfs_ratetable_show(struct seq_file *s, void *data)
 	if (!found)
 		return -EINVAL;
 
-	rate_table = kzalloc(table_size, GFP_KERNEL);
+	rate_table = kmalloc(table_size, GFP_KERNEL);
 	if (!rate_table)
 		return -ENOMEM;
 
@@ -919,7 +919,7 @@ static ssize_t mwl_debugfs_tx_hist_write(struct file *file,
 		return ret;
 
 	if (!reset) {
-		memset(&priv->ra_tx_attempt, 0, 2 * 6 * sizeof(u32));
+		memset(priv->ra_tx_attempt, 0, sizeof(priv->ra_tx_attempt));
 		scoped_guard(spinlock_bh, &priv->sta_lock) {
 			list_for_each_entry(sta_info, &priv->sta_list, list) {
 				memset(&sta_info->tx_hist, 0,
