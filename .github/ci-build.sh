@@ -44,10 +44,16 @@ mkdir -p "$out"
 (cd "$src" && git ls-files -z | xargs -0 cp --parents -t "$out")
 
 # Sparse cannot follow locks released by guard() and scoped_guard() and
-# reports a context imbalance for every function that takes one; kernels
-# from 6.19 on no longer give sparse lock contexts at all.
+# reports a context imbalance for every function that takes one.
 $kmake -C "$kout" M="$out" W=1 C=1 CF=-Wno-context KBUILD_MODPOST_WARN=1 \
 	-j"$(nproc)" modules 2>&1 | tee "$out/build.log"
+
+# Make sure sparse really ran: the kernel skips it with only a warning
+# when it is missing or too old.
+if grep -q 'specified, but .* is not available' "$out/build.log"; then
+	echo "sparse did not run" >&2
+	exit 1
+fi
 
 # Undefined symbols are expected: modules_prepare does not build the
 # kernel's Module.symvers.

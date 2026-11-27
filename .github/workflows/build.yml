@@ -24,7 +24,17 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            bc bison flex libelf-dev libssl-dev sparse clang lld llvm
+            bc bison flex libelf-dev libssl-dev clang lld llvm
+
+      # The sparse release Ubuntu ships is too old for current kernels,
+      # which then skip the check with only a make warning.
+      - name: Build sparse
+        run: |
+          git clone --depth 1 https://git.kernel.org/pub/scm/devel/sparse/sparse.git "$RUNNER_TEMP/sparse"
+          make -C "$RUNNER_TEMP/sparse" -j"$(nproc)" HAVE_GTK=no HAVE_LLVM=no HAVE_LIBXML=no \
+            PREFIX="$HOME/.local" install
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          sparse --version
 
       - name: Cache kernel build
         uses: actions/cache@v4
