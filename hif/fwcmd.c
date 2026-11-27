@@ -575,16 +575,23 @@ static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv,
 	pcmd->start_cmd.probe_delay = cpu_to_le16(10);
 	pcmd->start_cmd.cap_info = cpu_to_le16(mwl_vif->beacon_info.cap_info);
 
+	/* The elements come from the beacon template and can be longer
+	 * than the fixed-size fields of the command, e.g. a WPA element
+	 * with two pairwise ciphers. Copy only what fits.
+	 */
 	memcpy(&pcmd->start_cmd.wmm_param, mwl_vif->beacon_info.ie_wmm_ptr,
-	       mwl_vif->beacon_info.ie_wmm_len);
+	       min_t(size_t, mwl_vif->beacon_info.ie_wmm_len,
+		     sizeof(pcmd->start_cmd.wmm_param)));
 
 	memcpy(&pcmd->start_cmd.wpa_ie, mwl_vif->beacon_info.ie_wpa_ptr,
-	       mwl_vif->beacon_info.ie_wpa_len);
+	       min_t(size_t, mwl_vif->beacon_info.ie_wpa_len,
+		     sizeof(pcmd->start_cmd.wpa_ie)));
 
 	if (priv->chip_type != MWL8964)
 		memcpy(&pcmd->start_cmd.rsn48_ie,
 		       mwl_vif->beacon_info.ie_rsn48_ptr,
-		       mwl_vif->beacon_info.ie_rsn48_len);
+		       min_t(size_t, mwl_vif->beacon_info.ie_rsn48_len,
+			     sizeof(pcmd->start_cmd.rsn48_ie)));
 
 	memcpy(pcmd->start_cmd.b_rate_set, mwl_vif->beacon_info.b_rate_set,
 	       SYSADPT_MAX_DATA_RATES_G);
