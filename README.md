@@ -37,20 +37,43 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
 
 * WiFi device does not use HT rates when using TKIP as the encryption cipher. If you want to have good performance, please use AES only.
 
-* DTS parameters for mwlwifi driver (pcie@X,0):
+* DTS parameters for mwlwifi driver. They go in the node of the PCI device, a child of the PCIe port with a matching reg (as for mt76):
     ```sh
-    #Disable 2g band
-    marvell,2ghz = <0>;
+    &pcie1 {
+        wifi@0,0 {
+            reg = <0x0000 0 0 0 0>;
 
-    #Disable 5g band
-    marvell,5ghz = <0>;
-    
-    #Specify antenna number, default is 4x4. For WRT1200AC, you must set these values to 2x2.
-    marvell,chainmask = <4 4>;
-    
-    #Specify external power table. If your device needs external power table, you must provide the power table via this parameter, otherwise the Tx power will be pretty low.
-    marvell,powertable
+            #Disable 2g band
+            marvell,2ghz = <0>;
+
+            #Disable 5g band
+            marvell,5ghz = <0>;
+
+            #Specify antenna number, default is 4x4. For WRT1200AC, you must set these values to 2x2.
+            marvell,chainmask = <4 4>;
+
+            #Specify external power table. If your device needs external power table, you must provide the power table via this parameter, otherwise the Tx power will be pretty low.
+            marvell,powertable {
+                #Used for the countries listed
+                r0 {
+                    country = "AU";
+                    table = <...>;
+                };
+                #Used for the DFS regions listed (FCC, ETSI or JP)
+                r1 {
+                    regdomain = "ETSI";
+                    table = <...>;
+                };
+                #Neither country nor regdomain: used when nothing else matches
+                r2 {
+                    table = <...>;
+                };
+            };
+        };
+    };
     ```
+
+    The first node whose country or regdomain matches is used, so list countries before regions. Each table entry is `<channel setcap power[16] cdd txantenna2>`. The generic `ieee80211-freq-limit` property is supported as well.
 
     To see if your device needs/accepts an external power table or not, run the following:
     ```sh
