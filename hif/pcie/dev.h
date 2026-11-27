@@ -663,11 +663,10 @@ enum { /* Definition of accounting record codes */
 	ACNT_CODE_BF_MIMO_CTRL,/* BF Mimo Ctrl Field Log (acnt_bf_mimo_ctrl_s)*/
 };
 
-struct acnt_s { /* Baseline Accounting Record format */
+struct acnt_s { /* Common header of every Accounting Record */
 	__le16 code;          /* Unique code for each type                    */
 	u8 len;               /* Length in DWORDS, including header           */
 	u8 pad;               /* Alignment for generic, but specific can reuse*/
-	__le32 tsf;           /* Timestamp for Entry (when len>1)             */
 } __packed;
 
 struct acnt_tx_s { /* Accounting Record For Tx (at Enqueue time) */

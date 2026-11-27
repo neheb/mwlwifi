@@ -1359,7 +1359,7 @@ static size_t pcie_acnt_min_len(u16 code)
 	case ACNT_CODE_BF_MIMO_CTRL:
 		return sizeof(struct acnt_bf_mimo_ctrl_s);
 	default:
-		return offsetof(struct acnt_s, tsf);
+		return sizeof(struct acnt_s);
 	}
 }
 
@@ -1428,7 +1428,7 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 
 	pstart = acnt_recds;
 	pend = pstart + read_size;
-	while (pend - pstart >= offsetof(struct acnt_s, tsf)) {
+	while (pend - pstart >= sizeof(struct acnt_s)) {
 		acnt = (struct acnt_s *)pstart;
 		code = le16_to_cpu(acnt->code);
 		rec_len = acnt->len * 4;
