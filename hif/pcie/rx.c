@@ -430,7 +430,11 @@ int pcie_rx_poll_napi(struct napi_struct *napi, int budget)
 		}
 
 		skb_put(prx_skb, pkt_len);
-		pcie_rx_remove_dma_header(prx_skb, curr_hndl->pdesc->qos_ctrl);
+		if (unlikely(!pcie_rx_remove_dma_header(prx_skb,
+						curr_hndl->pdesc->qos_ctrl))) {
+			dev_kfree_skb_any(prx_skb);
+			goto refill;
+		}
 
 		wh = (struct ieee80211_hdr *)prx_skb->data;
 

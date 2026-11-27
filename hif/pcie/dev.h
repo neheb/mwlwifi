@@ -1011,13 +1011,18 @@ static inline void pcie_rx_prepare_status(struct mwl_priv *priv, u16 format,
 	}
 }
 
-static inline void pcie_rx_remove_dma_header(struct sk_buff *skb, __le16 qos)
+/* Returns false if the header doesn't fit in the DMA header, e.g. one
+ * with an HT Control field; the caller drops the frame.
+ */
+static inline bool pcie_rx_remove_dma_header(struct sk_buff *skb, __le16 qos)
 {
 	struct pcie_dma_data *dma_data;
 	int hdrlen;
 
 	dma_data = (struct pcie_dma_data *)skb->data;
 	hdrlen = ieee80211_hdrlen(dma_data->wh.frame_control);
+	if (hdrlen > sizeof(*dma_data))
+		return false;
 
 	if (hdrlen != sizeof(dma_data->wh)) {
 		/* Adding qos to a nullfunc frame causes problems. */
@@ -1032,6 +1037,8 @@ static inline void pcie_rx_remove_dma_header(struct sk_buff *skb, __le16 qos)
 
 	if (hdrlen != sizeof(*dma_data))
 		skb_pull(skb, sizeof(*dma_data) - hdrlen);
+
+	return true;
 }
 
 /* RX buffers are page_pool pages, each holding one frame: headroom, then

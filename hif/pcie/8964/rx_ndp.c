@@ -334,7 +334,10 @@ static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 	struct mwl_vif *mwl_vif = NULL;
 	struct sk_buff* monitor_skb;
 
-	pcie_rx_remove_dma_header(skb, 0);
+	if (unlikely(!pcie_rx_remove_dma_header(skb, 0))) {
+		dev_kfree_skb_any(skb);
+		return;
+	}
 	status = IEEE80211_SKB_RXCB(skb);
 	memset(status, 0, sizeof(*status));
 	status->signal = -signal;
