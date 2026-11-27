@@ -165,8 +165,8 @@ static void pcie_tx_return_skb_ndp(struct ieee80211_hw *hw, u32 index,
 		if (ieee80211_is_qos_nullfunc(dma_data->wh.frame_control) ||
 		   ieee80211_is_data_qos(dma_data->wh.frame_control)) {
 			memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen - IEEE80211_QOS_CTL_LEN);
-			*((__le16 *)(dma_data->data - IEEE80211_QOS_CTL_LEN)) =
-				cpu_to_le16(tx_ctrl->qos);
+			put_unaligned_le16(tx_ctrl->qos, dma_data->data -
+					   IEEE80211_QOS_CTL_LEN);
 		} else
 			memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen);
 		skb_pull(skb, sizeof(*dma_data) - hdrlen);

@@ -242,7 +242,7 @@ int pcie_download_firmware(struct ieee80211_hw *hw)
 	 * part is similar as SC1
 	 */
 	/* pcmd[1] is only 2-byte aligned. */
-	put_unaligned(0, (u32 *)&pcmd[1]);
+	put_unaligned_le32(0, &pcmd[1]);
 	pcie_trigger_pcicmd_bootcode(pcie_priv);
 	timeout = jiffies + msecs_to_jiffies(FW_READY_TIMEOUT_MS);
 	do {

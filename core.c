@@ -332,7 +332,8 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 	struct property *fcc_prop = NULL;
 	struct property *etsi_prop = NULL;
 	struct property *specific_prop = NULL;
-	u32 prop_value;
+	const __be32 *val;
+	int entries;
 	int i, j, k;
 #endif
 
@@ -389,41 +390,19 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 			 * setcap, the power levels, cdd and txantenna2.
 			 * Only load complete entries that fit in the table.
 			 */
-			i = 0;
-			j = 0;
-			while (prop->length - i >= MWL_PWR_TBL_ENTRY_SIZE &&
-			       j < SYSADPT_MAX_NUM_CHANNELS) {
-				prop_value =
-					be32_to_cpu(*(__be32 *)
-						    (prop->value + i));
-				priv->tx_pwr_tbl[j].channel = prop_value;
-				i += 4;
-				prop_value =
-					be32_to_cpu(*(__be32 *)
-						    (prop->value + i));
-				priv->tx_pwr_tbl[j].setcap = prop_value;
-				i += 4;
-				for (k = 0; k < SYSADPT_TX_POWER_LEVEL_TOTAL;
-				     k++) {
-					prop_value =
-						be32_to_cpu(*(__be32 *)
-							    (prop->value + i));
-					priv->tx_pwr_tbl[j].tx_power[k] =
-						prop_value;
-					i += 4;
-				}
-				prop_value =
-					be32_to_cpu(*(__be32 *)
-						    (prop->value + i));
-				priv->tx_pwr_tbl[j].cdd =
-					(prop_value == 0) ? false : true;
-				i += 4;
-				prop_value =
-					be32_to_cpu(*(__be32 *)
-						    (prop->value + i));
-				priv->tx_pwr_tbl[j].txantenna2 = prop_value;
-				i += 4;
-				j++;
+			val = prop->value;
+			entries = min_t(int,
+					prop->length / MWL_PWR_TBL_ENTRY_SIZE,
+					SYSADPT_MAX_NUM_CHANNELS);
+			for (j = 0; j < entries; j++) {
+				struct mwl_tx_pwr_tbl *tbl = &priv->tx_pwr_tbl[j];
+
+				tbl->channel = be32_to_cpup(val++);
+				tbl->setcap = be32_to_cpup(val++);
+				for (k = 0; k < SYSADPT_TX_POWER_LEVEL_TOTAL; k++)
+					tbl->tx_power[k] = be32_to_cpup(val++);
+				tbl->cdd = !!be32_to_cpup(val++);
+				tbl->txantenna2 = be32_to_cpup(val++);
 			}
 
 			/* Dump loaded power tabel */

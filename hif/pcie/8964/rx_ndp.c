@@ -19,6 +19,7 @@
 
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/unaligned.h>
 
 #include "sysadpt.h"
 #include "core.h"
@@ -232,7 +233,7 @@ static inline void pcie_rx_process_fast_data(struct mwl_priv *priv,
 	if (!mwl_vif)
 		goto drop_packet_unlock;
 
-	ethertype = (skb->data[20] << 8) | skb->data[21];
+	ethertype = get_unaligned_be16(&skb->data[20]);
 	fc = cpu_to_le16(IEEE80211_FTYPE_DATA | IEEE80211_STYPE_DATA);
 
 	memset(&hdr, 0, sizeof(hdr));
@@ -533,7 +534,7 @@ int pcie_rx_poll_ndp(struct napi_struct *napi, int budget)
 				dev_kfree_skb_any(psk_buff);
 				break;
 			}
-			pktlen = psk_buff->data[12] << 8 | psk_buff->data[13];
+			pktlen = get_unaligned_be16(&psk_buff->data[12]);
 			pktlen += ETH_HLEN;
 
 			/* The fast data path reads the LLC/SNAP ethertype. */
