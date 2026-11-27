@@ -703,8 +703,7 @@ static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
 {
 	cmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_UPDATE_ENCRYPTION);
 	cmd->cmd_hdr.len = cpu_to_le16(sizeof(*cmd));
-	cmd->key_param.length = cpu_to_le16(sizeof(*cmd) -
-		offsetof(struct hostcmd_cmd_set_key, key_param));
+	cmd->key_param.length = cpu_to_le16(sizeof(cmd->key_param));
 	cmd->key_param.key_index = cpu_to_le32(key->keyidx);
 	cmd->key_param.key_len = cpu_to_le16(key->keylen);
 	ether_addr_copy(cmd->key_param.mac_addr, addr);
@@ -1287,7 +1286,7 @@ int mwl_fwcmd_set_cfg_data(struct ieee80211_hw *hw, u16 type)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_cfg *pcmd = priv->pcmd_buf;
-	size_t max = MWL_CMD_BUF_SIZE - offsetof(typeof(*pcmd), data);
+	size_t max = MWL_CMD_BUF_SIZE - sizeof(*pcmd);
 	size_t consumed;
 	int parsed_len;
 
@@ -3279,8 +3278,7 @@ int mwl_fwcmd_set_txpwrlmt_cfg_data(struct ieee80211_hw *hw)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_txpwrlmt_cfg *pcmd;
 	struct mwl_txpwrlmt_cfg_entry_hdr hdr;
-	size_t max = MWL_CMD_BUF_SIZE -
-		     offsetof(struct hostcmd_cmd_txpwrlmt_cfg, data);
+	size_t max = MWL_CMD_BUF_SIZE - sizeof(*pcmd);
 	size_t size, parsed_len;
 	u16 id;
 	bool last;
