@@ -525,8 +525,15 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 		}
 	}
 
-	if (changed & BSS_CHANGED_BEACON_ENABLED)
+	if (changed & BSS_CHANGED_BEACON_ENABLED) {
 		mwl_fwcmd_bss_start(hw, vif, info->enable_beacon);
+		/* The AP can be stopped and started again with another
+		 * configuration on the same interface, as OpenWrt's
+		 * "wifi reload" does. Give the firmware the new beacon then.
+		 */
+		if (!info->enable_beacon)
+			mwl_vif->set_beacon = false;
+	}
 }
 
 static void mwl_mac80211_bss_info_changed(struct ieee80211_hw *hw,
