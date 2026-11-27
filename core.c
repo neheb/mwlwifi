@@ -873,6 +873,10 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	ieee80211_hw_set(hw, AP_LINK_PS);
 
 	ieee80211_hw_set(hw, SUPPORTS_PER_STA_GTK);
+	/* The fast path builds the same headers; TKIP keys, which need
+	 * the MIC from mac80211, keep using the slow path.
+	 */
+	ieee80211_hw_set(hw, SUPPORT_FAST_XMIT);
 	ieee80211_hw_set(hw, MFP_CAPABLE);
 
 	hw->wiphy->flags |= WIPHY_FLAG_IBSS_RSN;
