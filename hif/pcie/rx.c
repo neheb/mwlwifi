@@ -53,7 +53,7 @@ static int pcie_rx_ring_alloc(struct mwl_priv *priv)
 				   GFP_KERNEL);
 
 	if (!desc->prx_ring) {
-		wiphy_err(priv->hw->wiphy, "cannot alloc mem\n");
+		wiphy_err(priv->hw->wiphy, "cannot alloc RX ring\n");
 		return -ENOMEM;
 	}
 
@@ -69,7 +69,7 @@ static int pcie_rx_ring_alloc(struct mwl_priv *priv)
 	if (IS_ERR(pcie_priv->rx_page_pool)) {
 		rc = PTR_ERR(pcie_priv->rx_page_pool);
 		pcie_priv->rx_page_pool = NULL;
-		wiphy_err(priv->hw->wiphy, "cannot create page pool\n");
+		wiphy_err(priv->hw->wiphy, "cannot create RX page pool\n");
 		return rc;
 	}
 
@@ -300,16 +300,12 @@ int pcie_rx_init(struct ieee80211_hw *hw)
 	int rc;
 
 	rc = pcie_rx_ring_alloc(priv);
-	if (rc) {
-		wiphy_err(hw->wiphy, "allocating RX ring failed\n");
+	if (rc)
 		return rc;
-	}
 
 	rc = pcie_rx_ring_init(priv);
 	if (rc) {
 		pcie_rx_ring_free(priv);
-		wiphy_err(hw->wiphy,
-			  "initializing RX ring failed\n");
 		return rc;
 	}
 

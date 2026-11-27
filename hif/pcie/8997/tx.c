@@ -95,7 +95,7 @@ static int pcie_txbd_ring_create(struct mwl_priv *priv)
 				  GFP_KERNEL);
 
 	if (!mem) {
-		wiphy_err(priv->hw->wiphy, "cannot alloc mem\n");
+		wiphy_err(priv->hw->wiphy, "cannot alloc TX ring\n");
 		return -ENOMEM;
 	}
 	pcie_priv->txbd_ring_vbase = mem;
@@ -467,11 +467,8 @@ int pcie_8997_tx_init(struct ieee80211_hw *hw)
 
 
 	rc = pcie_txbd_ring_create(priv);
-
-	if (rc) {
-		wiphy_err(hw->wiphy, "allocating TX ring failed\n");
+	if (rc)
 		return rc;
-	}
 
 	pcie_tx_ring_init(priv);
 

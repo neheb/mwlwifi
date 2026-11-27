@@ -62,14 +62,14 @@ static int pcie_rx_ring_alloc_ndp(struct mwl_priv *priv)
 		int rc = PTR_ERR(pcie_priv->rx_page_pool);
 
 		pcie_priv->rx_page_pool = NULL;
-		wiphy_err(priv->hw->wiphy, "cannot create page pool\n");
+		wiphy_err(priv->hw->wiphy, "cannot create RX page pool\n");
 		return rc;
 	}
 	return 0;
 
 err_no_mem:
 
-	wiphy_err(priv->hw->wiphy, "cannot alloc mem\n");
+	wiphy_err(priv->hw->wiphy, "cannot alloc RX ring\n");
 	return -ENOMEM;
 }
 
@@ -418,15 +418,12 @@ int pcie_rx_init_ndp(struct ieee80211_hw *hw)
 	rc = pcie_rx_ring_alloc_ndp(priv);
 	if (rc) {
 		pcie_rx_ring_free_ndp(priv);
-		wiphy_err(hw->wiphy, "allocating RX ring failed\n");
 		return rc;
 	}
 
 	rc = pcie_rx_ring_init_ndp(priv);
 	if (rc) {
 		pcie_rx_ring_free_ndp(priv);
-		wiphy_err(hw->wiphy,
-			  "initializing RX ring failed\n");
 		return rc;
 	}
 

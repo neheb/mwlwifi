@@ -97,7 +97,7 @@ static int pcie_tx_ring_alloc_ndp(struct mwl_priv *priv)
 
 err_no_mem:
 
-	wiphy_err(priv->hw->wiphy, "cannot alloc mem\n");
+	wiphy_err(priv->hw->wiphy, "cannot alloc TX ring\n");
 
 	return -ENOMEM;
 }
@@ -414,14 +414,12 @@ int pcie_tx_init_ndp(struct ieee80211_hw *hw)
 	rc = pcie_tx_ring_alloc_ndp(priv);
 	if (rc) {
 		pcie_tx_ring_free_ndp(priv);
-		wiphy_err(hw->wiphy, "allocating TX ring failed\n");
 		return rc;
 	}
 
 	rc = pcie_tx_ring_init_ndp(priv);
 	if (rc) {
 		pcie_tx_ring_free_ndp(priv);
-		wiphy_err(hw->wiphy, "initializing TX ring failed\n");
 		return rc;
 	}
 

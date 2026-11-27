@@ -83,7 +83,7 @@ static int pcie_tx_ring_alloc(struct mwl_priv *priv)
 				 GFP_KERNEL);
 
 	if (!mem) {
-		wiphy_err(priv->hw->wiphy, "cannot alloc mem\n");
+		wiphy_err(priv->hw->wiphy, "cannot alloc TX ring\n");
 		return -ENOMEM;
 	}
 
@@ -99,7 +99,7 @@ static int pcie_tx_ring_alloc(struct mwl_priv *priv)
 	mem = devm_kcalloc(priv->dev, PCIE_NUM_OF_DESC_DATA,
 			   MAX_NUM_TX_HNDL_BYTES, GFP_KERNEL);
 	if (!mem) {
-		wiphy_err(priv->hw->wiphy, "cannot alloc mem\n");
+		wiphy_err(priv->hw->wiphy, "cannot alloc TX ring\n");
 		return -ENOMEM;
 	}
 
@@ -498,16 +498,12 @@ int pcie_8864_tx_init(struct ieee80211_hw *hw)
 		     offsetof(struct ieee80211_tx_info, driver_data));
 
 	rc = pcie_tx_ring_alloc(priv);
-
-	if (rc) {
-		wiphy_err(hw->wiphy, "allocating TX ring failed\n");
+	if (rc)
 		return rc;
-	}
 
 	rc = pcie_tx_ring_init(priv);
 	if (rc) {
 		pcie_tx_ring_free(priv);
-		wiphy_err(hw->wiphy, "initializing TX ring failed\n");
 		return rc;
 	}
 

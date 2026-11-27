@@ -952,10 +952,8 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	spin_lock_init(&priv->stnid_lock);
 
 	rc = mwl_hif_init(hw);
-	if (rc) {
-		wiphy_err(hw->wiphy, "fail to initialize host interface\n");
+	if (rc)
 		return rc;
-	}
 
 	/* The cooling device sends firmware commands, so it can only be
 	 * registered once the host interface is up.

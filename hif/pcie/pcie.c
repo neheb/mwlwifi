@@ -208,23 +208,15 @@ static int pcie_init_8997(struct ieee80211_hw *hw)
 	pcie_priv->recv_limit = PCIE_RECEIVE_LIMIT;
 
 	rc = pcie_8997_tx_init(hw);
-	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to initialize TX\n",
-			  PCIE_DRV_NAME);
+	if (rc)
 		goto err_mwl_tx_init;
-	}
 
 	rc = pcie_rx_init(hw);
-	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to initialize RX\n",
-			  PCIE_DRV_NAME);
+	if (rc)
 		goto err_mwl_rx_init;
-	}
 
 	/* get and prepare HW specifications */
 	if (mwl_fwcmd_get_hw_specs(hw, &hw_spec)) {
-		wiphy_err(hw->wiphy, "%s: fail to get HW specifications\n",
-			  PCIE_DRV_NAME);
 		rc = -EIO;
 		goto err_get_hw_specs;
 	}
@@ -277,8 +269,6 @@ err_mwl_tx_init:
 	netif_napi_del(&pcie_priv->napi);
 	free_netdev(pcie_priv->napi_dev);
 
-	wiphy_err(hw->wiphy, "%s: init fail\n", PCIE_DRV_NAME);
-
 	return rc;
 }
 
@@ -307,21 +297,15 @@ static int pcie_init_8864(struct ieee80211_hw *hw)
 	pcie_priv->recv_limit = PCIE_RECEIVE_LIMIT;
 
 	rc = pcie_8864_tx_init(hw);
-	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to initialize TX\n",
-			  PCIE_DRV_NAME);
+	if (rc)
 		goto err_mwl_tx_init;
-	}
 
 	rc = pcie_rx_init(hw);
-	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to initialize RX\n", PCIE_DRV_NAME);
+	if (rc)
 		goto err_mwl_rx_init;
-	}
 
 	/* get and prepare HW specifications */
 	if (mwl_fwcmd_get_hw_specs(hw, &hw_spec)) {
-		wiphy_err(hw->wiphy, "%s: fail to get HW specifications\n", PCIE_DRV_NAME);
 		rc = -EIO;
 		goto err_get_hw_specs;
 	}
@@ -376,8 +360,6 @@ err_mwl_rx_init:
 err_mwl_tx_init:
 	netif_napi_del(&pcie_priv->napi);
 	free_netdev(pcie_priv->napi_dev);
-
-	wiphy_err(hw->wiphy, "%s: init fail\n", PCIE_DRV_NAME);
 
 	return rc;
 }
@@ -746,23 +728,15 @@ static int pcie_init_ndp(struct ieee80211_hw *hw)
 	pcie_priv->tx_inflight_max = TX_INFLIGHT_MAX;
 
 	rc = pcie_tx_init_ndp(hw);
-	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to initialize TX\n",
-			  PCIE_DRV_NAME);
+	if (rc)
 		goto err_mwl_tx_init;
-	}
 
 	rc = pcie_rx_init_ndp(hw);
-	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to initialize RX\n",
-			  PCIE_DRV_NAME);
+	if (rc)
 		goto err_mwl_rx_init;
-	}
 
 	/* get and prepare HW specifications */
 	if (mwl_fwcmd_get_hw_specs(hw, &hw_spec)) {
-		wiphy_err(hw->wiphy, "%s: fail to get HW specifications\n",
-			  PCIE_DRV_NAME);
 		rc = -EIO;
 		goto err_get_hw_specs;
 	}
@@ -807,8 +781,6 @@ err_mwl_rx_init:
 err_mwl_tx_init:
 	netif_napi_del(&pcie_priv->napi);
 	free_netdev(pcie_priv->napi_dev);
-
-	wiphy_err(hw->wiphy, "%s: init fail\n", PCIE_DRV_NAME);
 
 	return rc;
 }
