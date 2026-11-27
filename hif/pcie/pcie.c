@@ -999,6 +999,14 @@ static void pcie_tx_account(struct mwl_priv *priv,
 	struct mwl_tx_hist *tx_hist;
 	struct mwl_tx_hist_data *tx_hist_data;
 
+	/* The airtime of the PPDU in us, for airtime fairness. The queue a
+	 * station's frames go out on ends in their TID.
+	 */
+	ieee80211_sta_register_airtime(mwl_sta_to_ieee80211(sta_info),
+				       le16_to_cpu(acnt_tx->qid) %
+				       SYSADPT_MAX_TID,
+				       le16_to_cpu(acnt_tx->air_time), 0);
+
 	rate_info = le32_to_cpu(acnt_tx->tx_info.rate_info);
 	tx_cnt = le32_to_cpu(acnt_tx->tx_cnt);
 	index = acnt_tx->rate_tbl_index;
@@ -1097,6 +1105,12 @@ static void pcie_rx_account(struct mwl_priv *priv,
 {
 	u32 sig1, sig2, rate, param;
 	u16 format, nss, bw, gi, rate_mcs;
+
+	/* The header carries no QoS control, so the TID is unknown: count
+	 * the airtime as best effort, where most traffic is.
+	 */
+	ieee80211_sta_register_airtime(mwl_sta_to_ieee80211(sta_info), 0, 0,
+				       le16_to_cpu(acnt_rx->air_time));
 
 	sig1 = FIELD_GET(RXINFO_HT_SIG1, le32_to_cpu(acnt_rx->rx_info.ht_sig1));
 	sig2 = FIELD_GET(RXINFO_HT_SIG2,

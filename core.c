@@ -886,6 +886,11 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	if (priv->chip_type == MWL8964) {
 		hw->wiphy->cipher_suites = cipher_suites_8964;
 		hw->wiphy->n_cipher_suites = ARRAY_SIZE(cipher_suites_8964);
+		/* It pulls frames through mac80211's scheduler and reports
+		 * the airtime of every PPDU in its accounting records.
+		 */
+		wiphy_ext_feature_set(hw->wiphy,
+				      NL80211_EXT_FEATURE_AIRTIME_FAIRNESS);
 	} else {
 		hw->wiphy->cipher_suites = cipher_suites;
 		hw->wiphy->n_cipher_suites = ARRAY_SIZE(cipher_suites);
