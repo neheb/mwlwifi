@@ -383,8 +383,7 @@ static int mwl_debugfs_vif_show(struct seq_file *s, void *data)
 
 	guard(spinlock_bh)(&priv->vif_lock);
 	list_for_each_entry(mwl_vif, &priv->vif_list, list) {
-		vif = container_of((void *)mwl_vif, struct ieee80211_vif,
-				   drv_priv);
+		vif = mwl_vif_to_ieee80211(mwl_vif);
 		seq_printf(s, "macid: %d\n", mwl_vif->macid);
 		switch (vif->type) {
 		case NL80211_IFTYPE_AP:
@@ -463,8 +462,7 @@ static int mwl_debugfs_sta_show(struct seq_file *s, void *data)
 
 	guard(spinlock_bh)(&priv->sta_lock);
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
-		sta = container_of((void *)sta_info, struct ieee80211_sta,
-				   drv_priv);
+		sta = mwl_sta_to_ieee80211(sta_info);
 
 		seq_printf(s, "%pM|%3d|%5s|%5s|%5s|%7s|     0x%02x|0x%06x, %02x-%02x,0x%02x, %02x, %02x, %02x|0x%08x|0x%04x, 0x%04x|rx %2d, %2d|%4d|%4d|%3d|%3d\n",
 			   sta->addr,
@@ -539,9 +537,7 @@ static int mwl_debugfs_ampdu_show(struct seq_file *s, void *data)
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
 		for (i = 0; i < MWL_MAX_TID; i++) {
 			if (sta_info->check_ba_failed[i]) {
-				sta = container_of((void *)sta_info,
-						   struct ieee80211_sta,
-						   drv_priv);
+				sta = mwl_sta_to_ieee80211(sta_info);
 				seq_printf(s, "%pM(%d): %d\n",
 					   sta->addr, i,
 					   sta_info->check_ba_failed[i]);
@@ -776,8 +772,7 @@ static int mwl_debugfs_ratetable_show(struct seq_file *s, void *data)
 	found = false;
 	spin_lock_bh(&priv->sta_lock);
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
-		sta = container_of((void *)sta_info, struct ieee80211_sta,
-				   drv_priv);
+		sta = mwl_sta_to_ieee80211(sta_info);
 		if (priv->ra_aid == sta->aid) {
 			ether_addr_copy(addr, sta->addr);
 			found = true;
@@ -894,8 +889,7 @@ static int mwl_debugfs_tx_hist_show(struct seq_file *s, void *data)
 		   priv->ra_tx_attempt[MU_MIMO][5]);
 	guard(spinlock_bh)(&priv->sta_lock);
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
-		sta = container_of((void *)sta_info, struct ieee80211_sta,
-				   drv_priv);
+		sta = mwl_sta_to_ieee80211(sta_info);
 		seq_printf(s, "\nSTA %pM\n", sta->addr);
 		seq_puts(s, "============================\n");
 		dump_tx_hist(s, sta_info);
@@ -961,7 +955,7 @@ static int mwl_debugfs_ba_hist_show(struct seq_file *s, void *data)
 		bmap0cnt = 0;
 		nobacnt = 0;
 		for (i = 0; i < ACNT_BA_SIZE; i++) {
-			if (!*(u32 *)&ba_stats[i])
+			if (!memchr_inv(&ba_stats[i], 0, sizeof(ba_stats[i])))
 				break;
 
 			/* If no BA event does not happen, check BA hole and BA

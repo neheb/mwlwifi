@@ -521,6 +521,19 @@ static inline struct mwl_sta *mwl_dev_get_sta(const struct ieee80211_sta *sta)
 	return (struct mwl_sta *)&sta->drv_priv;
 }
 
+/* Inverses of the above: drv_priv is a u8[], so container_of()'s type check
+ * needs the void * cast, kept here instead of at every caller.
+ */
+static inline struct ieee80211_vif *mwl_vif_to_ieee80211(struct mwl_vif *mwl_vif)
+{
+	return container_of((void *)mwl_vif, struct ieee80211_vif, drv_priv);
+}
+
+static inline struct ieee80211_sta *mwl_sta_to_ieee80211(struct mwl_sta *sta_info)
+{
+	return container_of((void *)sta_info, struct ieee80211_sta, drv_priv);
+}
+
 struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 				  int chip_type,
 				  struct device *dev,

@@ -265,18 +265,16 @@ static void mwl_fwcmd_add_other_ie(struct beacon_info *beacon_info,
 }
 
 static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
-				   struct mwl_vif *vif, u8 *beacon, int len)
+				   struct mwl_vif *vif, void *beacon, int len)
 {
-	struct ieee80211_mgmt *mgmt;
+	struct ieee80211_mgmt *mgmt = beacon;
 	struct beacon_info *beacon_info;
 	int baselen;
 	u8 *pos;
 	size_t left;
 	bool elem_parse_failed;
 
-	mgmt = (struct ieee80211_mgmt *)beacon;
-
-	baselen = mgmt->u.beacon.variable - beacon;
+	baselen = offsetof(struct ieee80211_mgmt, u.beacon.variable);
 	if (baselen > len)
 		return;
 
@@ -764,10 +762,11 @@ static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
  * of bytes produced, or -EINVAL for a dangling or malformed pair. The
  * number of source characters consumed is stored in *consumed.
  */
-static int mwl_fwcmd_parse_hex(const u8 *src, size_t len, u8 *dst,
+static int mwl_fwcmd_parse_hex(const u8 *src, size_t len, void *dst,
 			       size_t max, size_t *consumed)
 {
 	const u8 *ptr = src, *end = src + len;
+	u8 *out = dst;
 	size_t n = 0;
 
 	while (ptr < end && n < max) {
@@ -776,7 +775,7 @@ static int mwl_fwcmd_parse_hex(const u8 *src, size_t len, u8 *dst,
 			continue;
 		}
 
-		if (end - ptr < 2 || hex2bin(&dst[n], ptr, 1))
+		if (end - ptr < 2 || hex2bin(&out[n], ptr, 1))
 			return -EINVAL;
 		n++;
 		ptr += 2;
@@ -789,7 +788,7 @@ static int mwl_fwcmd_parse_hex(const u8 *src, size_t len, u8 *dst,
 /* Like mwl_fwcmd_parse_hex(), but fails unless exactly @want bytes are
  * parsed, so the destination is never left partly uninitialised.
  */
-static int mwl_fwcmd_parse_hex_exact(const u8 *src, size_t len, u8 *dst,
+static int mwl_fwcmd_parse_hex_exact(const u8 *src, size_t len, void *dst,
 				     size_t want, size_t *consumed)
 {
 	int n = mwl_fwcmd_parse_hex(src, len, dst, want, consumed);
@@ -3292,7 +3291,7 @@ int mwl_fwcmd_set_txpwrlmt_cfg_data(struct ieee80211_hw *hw)
 	size = priv->txpwrlmt_file->size;
 
 	/* Parsing TxPwrLmit Conf file Signature */
-	if (mwl_fwcmd_parse_hex_exact(ptr, size, (u8 *)&txpwr_cfg_sig,
+	if (mwl_fwcmd_parse_hex_exact(ptr, size, &txpwr_cfg_sig,
 				      TXPWRLMT_CFG_SIG_LEN, &parsed_len) < 0)
 		return -EINVAL;
 
@@ -3317,7 +3316,7 @@ int mwl_fwcmd_set_txpwrlmt_cfg_data(struct ieee80211_hw *hw)
 		u16 data_len;
 
 		/*Parsing tx pwr cfg subband header info*/
-		if (mwl_fwcmd_parse_hex_exact(ptr, size, (u8 *)&hdr,
+		if (mwl_fwcmd_parse_hex_exact(ptr, size, &hdr,
 					      sizeof(hdr), &parsed_len) < 0)
 			return -EINVAL;
 

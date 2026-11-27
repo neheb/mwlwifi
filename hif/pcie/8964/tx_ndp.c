@@ -19,6 +19,7 @@
 
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/unaligned.h>
 
 #include "sysadpt.h"
 #include "core.h"
@@ -648,7 +649,7 @@ static int pcie_tx_prepare_ndp(struct ieee80211_hw *hw,
 	wh = (struct ieee80211_hdr *)skb->data;
 
 	if (ieee80211_is_data_qos(wh->frame_control))
-		qos = le16_to_cpu(*((__le16 *)ieee80211_get_qos_ctl(wh)));
+		qos = get_unaligned_le16(ieee80211_get_qos_ctl(wh));
 	else
 		qos = 0xFFFF;
 

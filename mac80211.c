@@ -56,7 +56,7 @@ static void mwl_get_rateinfo(struct mwl_priv *priv, u8 *addr,
 			     struct mwl_sta *sta_info)
 {
 	int table_size = (sizeof(__le32) * 2 * SYSADPT_MAX_RATE_ADAPT_RATES);
-	u8 *rate_table, *rate_idx;
+	__le32 *rate_table;
 	u32 rate_info;
 	struct mwl_tx_hist_data *tx_hist_data;
 	int ret, idx;
@@ -72,17 +72,15 @@ static void mwl_get_rateinfo(struct mwl_priv *priv, u8 *addr,
 		return;
 	}
 
-	idx = 0;
-	rate_idx = rate_table;
-	rate_info = le32_to_cpu(*(__le32 *)rate_idx);
 	tx_hist_data = &sta_info->tx_hist.su_rate[0];
-	/* The table ends at a zero entry or after its last slot. */
-	while (rate_info) {
-		tx_hist_data[idx].rateinfo = rate_info;
-		if (++idx >= SYSADPT_MAX_RATE_ADAPT_RATES)
+	/* Each entry is two words; the table ends at a zero rate or after its
+	 * last slot.
+	 */
+	for (idx = 0; idx < SYSADPT_MAX_RATE_ADAPT_RATES; idx++) {
+		rate_info = le32_to_cpu(rate_table[2 * idx]);
+		if (!rate_info)
 			break;
-		rate_idx += (2 * sizeof(__le32));
-		rate_info = le32_to_cpu(*(__le32 *)rate_idx);
+		tx_hist_data[idx].rateinfo = rate_info;
 	}
 
 	kfree(rate_table);

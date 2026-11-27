@@ -271,8 +271,7 @@ struct mwl_sta *utils_find_sta(struct mwl_priv *priv, u8 *addr)
 	lockdep_assert_held(&priv->sta_lock);
 
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
-		sta = container_of((void *)sta_info, struct ieee80211_sta,
-				   drv_priv);
+		sta = mwl_sta_to_ieee80211(sta_info);
 		if (ether_addr_equal(addr, sta->addr))
 			return sta_info;
 	}
@@ -287,8 +286,7 @@ struct mwl_sta *utils_find_sta_by_aid(struct mwl_priv *priv, u16 aid)
 	lockdep_assert_held(&priv->sta_lock);
 
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
-		sta = container_of((void *)sta_info, struct ieee80211_sta,
-				   drv_priv);
+		sta = mwl_sta_to_ieee80211(sta_info);
 		if (sta->aid == aid)
 			return sta_info;
 	}

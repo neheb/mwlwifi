@@ -771,8 +771,7 @@ static void mwl_wds_check_handle(struct work_struct *work)
 		list_for_each_entry(sta_info, &priv->sta_list, list) {
 			if (sta_info->wds)
 				continue;
-			sta = container_of((void *)sta_info, struct ieee80211_sta,
-					   drv_priv);
+			sta = mwl_sta_to_ieee80211(sta_info);
 			if (ether_addr_equal(sta->addr, priv->wds_check_sta)) {
 				ether_addr_copy(addr, sta->addr);
 				macid = sta_info->mwl_vif->macid;
@@ -792,8 +791,7 @@ static void mwl_wds_check_handle(struct work_struct *work)
 	} else if (wds_sta) {
 		scoped_guard(spinlock_bh, &priv->sta_lock) {
 			list_for_each_entry(sta_info, &priv->sta_list, list) {
-				sta = container_of((void *)sta_info,
-						   struct ieee80211_sta, drv_priv);
+				sta = mwl_sta_to_ieee80211(sta_info);
 				if (ether_addr_equal(sta->addr, addr)) {
 					WRITE_ONCE(sta_info->wds, true);
 					break;
@@ -820,8 +818,7 @@ static void mwl_chnl_switch_event(struct work_struct *work)
 
 	scoped_guard(spinlock_bh, &priv->vif_lock) {
 		list_for_each_entry(mwl_vif, &priv->vif_list, list) {
-			vif = container_of((void *)mwl_vif, struct ieee80211_vif,
-					   drv_priv);
+			vif = mwl_vif_to_ieee80211(mwl_vif);
 
 			if (vif->bss_conf.csa_active) {
 				/* The beacon is only given to the firmware once,

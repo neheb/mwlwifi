@@ -17,6 +17,7 @@
 
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/unaligned.h>
 
 #include "sysadpt.h"
 #include "core.h"
@@ -606,7 +607,7 @@ void pcie_8997_tx_xmit(struct ieee80211_hw *hw,
 	mwl_vif = mwl_dev_get_vif(tx_info->control.vif);
 
 	if (ieee80211_is_data_qos(wh->frame_control))
-		qos = le16_to_cpu(*((__le16 *)ieee80211_get_qos_ctl(wh)));
+		qos = get_unaligned_le16(ieee80211_get_qos_ctl(wh));
 	else
 		qos = 0;
 
