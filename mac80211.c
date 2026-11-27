@@ -434,7 +434,7 @@ static void mwl_mac80211_update_wsc_ie(struct ieee80211_hw *hw,
 
 	if (len != mwl_vif->wsc_ie_len ||
 	    (len && memcmp(ie, mwl_vif->wsc_ie, len))) {
-		if (!mwl_fwcmd_set_wsc_ie(hw, len, (u8 *)ie)) {
+		if (!mwl_fwcmd_set_wsc_ie(hw, len, ie)) {
 			memcpy(mwl_vif->wsc_ie, ie, len);
 			mwl_vif->wsc_ie_len = len;
 		}

@@ -793,7 +793,7 @@ static int mwl_debugfs_ratetable_show(struct seq_file *s, void *data)
 	if (!rate_table)
 		return -ENOMEM;
 
-	ret = mwl_fwcmd_get_ratetable(priv->hw, addr, (u8 *)rate_table,
+	ret = mwl_fwcmd_get_ratetable(priv->hw, addr, rate_table,
 				      table_size, 0);
 	if (ret) {
 		kfree(rate_table);

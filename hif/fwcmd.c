@@ -276,7 +276,7 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 
 	mgmt = (struct ieee80211_mgmt *)beacon;
 
-	baselen = mgmt->u.beacon.variable - (u8 *)mgmt;
+	baselen = mgmt->u.beacon.variable - beacon;
 	if (baselen > len)
 		return;
 
@@ -2733,7 +2733,7 @@ int mwl_fwcmd_set_optimization_level(struct ieee80211_hw *hw, u8 opt_level)
 	return 0;
 }
 
-int mwl_fwcmd_set_wsc_ie(struct ieee80211_hw *hw, u16 len, u8 *data)
+int mwl_fwcmd_set_wsc_ie(struct ieee80211_hw *hw, u16 len, const u8 *data)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_wsc_ie *pcmd;
@@ -2768,7 +2768,7 @@ int mwl_fwcmd_set_wsc_ie(struct ieee80211_hw *hw, u16 len, u8 *data)
 	return 0;
 }
 
-int mwl_fwcmd_get_ratetable(struct ieee80211_hw *hw, u8 *addr, u8 *rate_table,
+int mwl_fwcmd_get_ratetable(struct ieee80211_hw *hw, u8 *addr, void *rate_table,
 			    u32 size, u8 type)
 {
 	struct mwl_priv *priv = hw->priv;

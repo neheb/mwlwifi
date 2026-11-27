@@ -340,7 +340,7 @@ struct sk_buff *pcie_tx_do_amsdu(struct mwl_priv *priv,
 	wh_len = ieee80211_hdrlen(wh->frame_control);
 	len = tx_skb->len - wh_len;
 
-	if (utils_is_crypted((struct ieee80211_hdr *)tx_skb->data)) {
+	if (utils_is_crypted(wh)) {
 		struct ieee80211_key_conf * k_conf;
 		k_conf = tx_info->control.hw_key;
 		if (likely(k_conf)) {

@@ -301,7 +301,7 @@ static inline void pcie_rx_process_fast_data(struct mwl_priv *priv,
 	if (ieee80211_is_data_qos(fc)) {
 		__le16 *qos_control;
 
-		qos_control = (__le16 *)skb_push(skb, IEEE80211_QOS_CTL_LEN);
+		qos_control = skb_push(skb, IEEE80211_QOS_CTL_LEN);
 		memcpy(skb_push(skb, hdrlen - IEEE80211_QOS_CTL_LEN), &hdr, hdrlen - IEEE80211_QOS_CTL_LEN);
 		if (ethertype == ETH_P_PAE)
 			*qos_control = cpu_to_le16(

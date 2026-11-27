@@ -218,9 +218,9 @@ bool mwl_fwcmd_ampdu_allowed(struct ieee80211_sta *sta, u8 tid);
 
 int mwl_fwcmd_set_optimization_level(struct ieee80211_hw *hw, u8 opt_level);
 
-int mwl_fwcmd_set_wsc_ie(struct ieee80211_hw *hw, u16 len, u8 *data);
+int mwl_fwcmd_set_wsc_ie(struct ieee80211_hw *hw, u16 len, const u8 *data);
 
-int mwl_fwcmd_get_ratetable(struct ieee80211_hw *hw, u8 *addr, u8 *rate_table,
+int mwl_fwcmd_get_ratetable(struct ieee80211_hw *hw, u8 *addr, void *rate_table,
 			    u32 size, u8 type);
 
 int mwl_fwcmd_get_seqno(struct ieee80211_hw *hw,
