@@ -283,12 +283,8 @@ static void mwl_process_of_dts(struct mwl_priv *priv)
 	struct property *prop;
 	u32 chainmask[2];
 
-	/* of_find_node_by_name() drops a reference on the node it starts
-	 * from, so take one for it.
-	 */
-	priv->dt_node =
-		of_find_node_by_name(of_node_get(mwl_hif_device_node(priv->hw)),
-				     "mwlwifi");
+	priv->dt_node = of_get_child_by_name(mwl_hif_device_node(priv->hw),
+					     "mwlwifi");
 	if (!priv->dt_node)
 		return;
 
@@ -314,7 +310,7 @@ static void mwl_process_of_dts(struct mwl_priv *priv)
 			priv->antenna_rx = ANTENNA_RX_3;
 	}
 
-	priv->pwr_node = of_find_node_by_name(of_node_get(priv->dt_node),
+	priv->pwr_node = of_get_child_by_name(priv->dt_node,
 					      "marvell,powertable");
 #endif
 }
