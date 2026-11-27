@@ -319,121 +319,108 @@ static void mwl_process_of_dts(struct mwl_priv *priv)
 #endif
 }
 
+/* Each power table entry is channel, setcap, the power levels, cdd and
+ * txantenna2, one cell each.
+ */
 #define MWL_PWR_TBL_ENTRY_SIZE \
 	((int)sizeof(__be32) * (2 + SYSADPT_TX_POWER_LEVEL_TOTAL + 2))
+
+/* The table for the country if there is one, else the FCC or ETSI one
+ * depending on the DFS region.
+ */
+static struct property *mwl_find_pwr_prop(struct mwl_priv *priv,
+					  const char *alpha2)
+{
+	struct property *prop;
+
+	for_each_property_of_node(priv->pwr_node, prop) {
+		if (!strncmp(prop->name, alpha2, 2))
+			return prop;
+	}
+
+	return of_find_property(priv->pwr_node,
+				priv->dfs_region == NL80211_DFS_ETSI ?
+				"ETSI" : "FCC", NULL);
+}
+
+static void mwl_dump_pwr_tbl(struct mwl_priv *priv, const char *name,
+			     int entries)
+{
+	char buf[SYSADPT_TX_POWER_LEVEL_TOTAL * 5 + 1];
+	int i, j, len;
+
+	wiphy_debug(priv->hw->wiphy, "regdomain: %s\n", name);
+	for (i = 0; i < entries; i++) {
+		struct mwl_tx_pwr_tbl *tbl = &priv->tx_pwr_tbl[i];
+
+		wiphy_debug(priv->hw->wiphy, "Channel: %d: 0x%x 0x%x 0x%x\n",
+			    tbl->channel, tbl->setcap, tbl->cdd,
+			    tbl->txantenna2);
+		buf[0] = '\0';
+		len = 0;
+		for (j = 0; j < SYSADPT_TX_POWER_LEVEL_TOTAL; j++)
+			len += scnprintf(buf + len, sizeof(buf) - len, "%x ",
+					 tbl->tx_power[j]);
+		wiphy_debug(priv->hw->wiphy, "%s\n", buf);
+	}
+}
+
+/* Replace the power table with the device tree one for the new region.
+ * Only complete entries that fit in the table are loaded.
+ */
+static void mwl_load_pwr_tbl(struct mwl_priv *priv, const char *alpha2)
+{
+	struct property *prop;
+	const __be32 *val;
+	int entries, i, j;
+
+	if (priv->chip_type == MWL8997 || !priv->pwr_node)
+		return;
+
+	prop = mwl_find_pwr_prop(priv, alpha2);
+	if (!prop)
+		return;
+
+	memset(priv->tx_pwr_tbl, 0, sizeof(priv->tx_pwr_tbl));
+
+	val = prop->value;
+	entries = min_t(int, prop->length / MWL_PWR_TBL_ENTRY_SIZE,
+			SYSADPT_MAX_NUM_CHANNELS);
+	for (i = 0; i < entries; i++) {
+		struct mwl_tx_pwr_tbl *tbl = &priv->tx_pwr_tbl[i];
+
+		tbl->channel = be32_to_cpup(val++);
+		tbl->setcap = be32_to_cpup(val++);
+		for (j = 0; j < SYSADPT_TX_POWER_LEVEL_TOTAL; j++)
+			tbl->tx_power[j] = be32_to_cpup(val++);
+		tbl->cdd = !!be32_to_cpup(val++);
+		tbl->txantenna2 = be32_to_cpup(val++);
+	}
+
+	mwl_dump_pwr_tbl(priv, prop->name, entries);
+}
 
 static void mwl_reg_notifier(struct wiphy *wiphy,
 			     struct regulatory_request *request)
 {
-	struct ieee80211_hw *hw;
-	struct mwl_priv *priv;
-#ifdef CONFIG_OF
-	struct property *prop;
-	struct property *fcc_prop = NULL;
-	struct property *etsi_prop = NULL;
-	struct property *specific_prop = NULL;
-	const __be32 *val;
-	int entries;
-	int i, j, k;
-#endif
-
-	hw = wiphy_to_ieee80211_hw(wiphy);
-	priv = hw->priv;
+	struct ieee80211_hw *hw = wiphy_to_ieee80211_hw(wiphy);
+	struct mwl_priv *priv = hw->priv;
 
 	if (priv->forbidden_setting) {
-		/* The firmware keeps its own power table either way, but a
-		 * region code missing from regmap[] gives no country to
-		 * hint.
+		/* The firmware keeps its own power table either way, so
+		 * push its country back on any other one. A region code
+		 * missing from regmap[] gives no country to hint.
 		 */
-		if (!priv->fw_alpha2[0])
-			return;
-		if (!priv->regulatory_set) {
+		if (priv->fw_alpha2[0] &&
+		    (!priv->regulatory_set ||
+		     memcmp(priv->fw_alpha2, request->alpha2, 2)))
 			regulatory_hint(wiphy, priv->fw_alpha2);
-			priv->regulatory_set = true;
-		} else {
-			if (memcmp(priv->fw_alpha2, request->alpha2, 2))
-				regulatory_hint(wiphy, priv->fw_alpha2);
-		}
+		priv->regulatory_set = true;
 		return;
 	}
 
 	priv->dfs_region = request->dfs_region;
-
-#ifdef CONFIG_OF
-	if ((priv->chip_type != MWL8997) && (priv->pwr_node)) {
-		for_each_property_of_node(priv->pwr_node, prop) {
-			if (strcmp(prop->name, "FCC") == 0)
-				fcc_prop = prop;
-			if (strcmp(prop->name, "ETSI") == 0)
-				etsi_prop = prop;
-			if ((prop->name[0] == request->alpha2[0]) &&
-			    (prop->name[1] == request->alpha2[1]))
-				specific_prop = prop;
-		}
-
-		prop = NULL;
-
-		if (specific_prop) {
-			prop = specific_prop;
-		} else {
-			if (priv->dfs_region == NL80211_DFS_ETSI)
-				prop = etsi_prop;
-			else
-				prop = fcc_prop;
-		}
-
-		if (prop) {
-			/* Reset the whole table */
-			memset(priv->tx_pwr_tbl, 0, sizeof(priv->tx_pwr_tbl));
-
-			/* Load related power table: each entry is channel,
-			 * setcap, the power levels, cdd and txantenna2.
-			 * Only load complete entries that fit in the table.
-			 */
-			val = prop->value;
-			entries = min_t(int,
-					prop->length / MWL_PWR_TBL_ENTRY_SIZE,
-					SYSADPT_MAX_NUM_CHANNELS);
-			for (j = 0; j < entries; j++) {
-				struct mwl_tx_pwr_tbl *tbl = &priv->tx_pwr_tbl[j];
-
-				tbl->channel = be32_to_cpup(val++);
-				tbl->setcap = be32_to_cpup(val++);
-				for (k = 0; k < SYSADPT_TX_POWER_LEVEL_TOTAL; k++)
-					tbl->tx_power[k] = be32_to_cpup(val++);
-				tbl->cdd = !!be32_to_cpup(val++);
-				tbl->txantenna2 = be32_to_cpup(val++);
-			}
-
-			/* Dump loaded power tabel */
-			wiphy_debug(hw->wiphy, "regdomain: %s\n", prop->name);
-			for (i = 0; i < SYSADPT_MAX_NUM_CHANNELS; i++) {
-				struct mwl_tx_pwr_tbl *pwr_tbl;
-				char disp_buf[SYSADPT_TX_POWER_LEVEL_TOTAL * 5 + 1];
-				int disp_len = 0;
-
-				pwr_tbl = &priv->tx_pwr_tbl[i];
-				if (pwr_tbl->channel == 0)
-					break;
-				wiphy_debug(hw->wiphy,
-					    "Channel: %d: 0x%x 0x%x 0x%x\n",
-					    pwr_tbl->channel,
-					    pwr_tbl->setcap,
-					    pwr_tbl->cdd,
-					    pwr_tbl->txantenna2);
-				disp_buf[0] = '\0';
-				for (j = 0; j < SYSADPT_TX_POWER_LEVEL_TOTAL;
-				     j++) {
-					disp_len += scnprintf(disp_buf + disp_len,
-							      sizeof(disp_buf) -
-							      disp_len, "%x ",
-							      pwr_tbl->tx_power[j]);
-				}
-				wiphy_debug(hw->wiphy, "%s\n", disp_buf);
-			}
-		}
-	}
-#endif
+	mwl_load_pwr_tbl(priv, request->alpha2);
 }
 
 static void mwl_regd_init(struct mwl_priv *priv)
