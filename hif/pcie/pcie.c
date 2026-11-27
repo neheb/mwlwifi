@@ -609,19 +609,6 @@ static void pcie_8864_tx_return_pkts(struct ieee80211_hw *hw)
 		ieee80211_purge_tx_queue(hw, &pcie_priv->txq[num]);
 }
 
-static struct device_node *pcie_get_device_node(struct ieee80211_hw *hw)
-{
-	struct mwl_priv *priv = hw->priv;
-	struct pcie_priv *pcie_priv = priv->hif.priv;
-	struct device_node *dev_node;
-
-	dev_node = pci_bus_to_OF_node(pcie_priv->pdev->bus);
-	if (dev_node)
-		wiphy_info(priv->hw->wiphy, "device node: %s\n", dev_node->full_name);
-
-	return dev_node;
-}
-
 static void pcie_get_survey(struct ieee80211_hw *hw,
 			    struct mwl_survey_info *survey_info)
 {
@@ -662,7 +649,6 @@ static struct mwl_hif_ops pcie_hif_ops_8997 = {
 	.tx_del_ampdu_pkts     = pcie_8997_tx_del_ampdu_pkts,
 	.tx_del_sta_amsdu_pkts = pcie_8997_tx_del_sta_amsdu_pkts,
 	.tx_return_pkts        = pcie_8997_tx_return_pkts,
-	.get_device_node       = pcie_get_device_node,
 	.get_survey            = pcie_get_survey,
 };
 
@@ -690,7 +676,6 @@ static struct mwl_hif_ops pcie_hif_ops_8864 = {
 	.tx_del_ampdu_pkts     = pcie_8864_tx_del_ampdu_pkts,
 	.tx_del_sta_amsdu_pkts = pcie_8864_tx_del_sta_amsdu_pkts,
 	.tx_return_pkts        = pcie_8864_tx_return_pkts,
-	.get_device_node       = pcie_get_device_node,
 	.get_survey            = pcie_get_survey,
 };
 
@@ -1546,7 +1531,6 @@ static const struct mwl_hif_ops pcie_hif_ops_ndp = {
 	.tx_xmit               = pcie_tx_xmit_ndp,
 	.tx_return_pkts        = pcie_tx_return_pkts_ndp,
 	.wake_tx_queue         = pcie_wake_tx_queue_ndp,
-	.get_device_node       = pcie_get_device_node,
 	.get_survey            = pcie_get_survey,
 	.set_sta_id            = pcie_set_sta_id,
 	.process_account       = pcie_process_account,

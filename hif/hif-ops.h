@@ -246,16 +246,6 @@ static inline void mwl_hif_tx_return_pkts(struct ieee80211_hw *hw)
 		priv->hif.ops->tx_return_pkts(hw);
 }
 
-static inline struct device_node *mwl_hif_device_node(struct ieee80211_hw *hw)
-{
-	struct mwl_priv *priv = hw->priv;
-
-	if (priv->hif.ops->get_device_node)
-		return priv->hif.ops->get_device_node(hw);
-	else
-		return NULL;
-}
-
 static inline void mwl_hif_get_survey(struct ieee80211_hw *hw,
 				      struct mwl_survey_info *survey_info)
 {
