@@ -198,18 +198,13 @@ static int mwl_prepare_cmd_buf(struct mwl_priv *priv)
 	if (!priv->pcmd_buf) {
 		wiphy_err(priv->hw->wiphy,
 			  "cannot alloc memory for command buffer\n");
-		goto err;
+		return -ENOMEM;
 	}
 	wiphy_debug(priv->hw->wiphy,
 		    "priv->pcmd_buf = %p  priv->pphys_cmd_buf = %pad\n",
 		    priv->pcmd_buf, &priv->pphys_cmd_buf);
 
 	return 0;
-
-err:
-	wiphy_err(priv->hw->wiphy, "command buffer alloc fail\n");
-
-	return -EIO;
 }
 
 /* Calibration and tx power limit data are board specific. Look for
@@ -260,14 +255,15 @@ static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name,
 	if (rc) {
 		wiphy_err(priv->hw->wiphy,
 			  "cannot find firmware image <%s>\n", fw_name);
-		goto err_load_fw;
+		return rc;
 	}
 
 	rc = mwl_hif_download_firmware(priv->hw);
 	if (rc) {
 		wiphy_err(priv->hw->wiphy,
 			  "cannot download firmware image <%s>\n", fw_name);
-		goto err_download_fw;
+		release_firmware(priv->fw_ucode);
+		return rc;
 	}
 
 	if (cal_name &&
@@ -277,16 +273,6 @@ static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name,
 	if (txpwrlmt_name &&
 	    mwl_request_board_file(priv, &priv->txpwrlmt_file, txpwrlmt_name))
 		wiphy_debug(priv->hw->wiphy, "no tx power limit data\n");
-
-	return rc;
-
-err_download_fw:
-
-	release_firmware(priv->fw_ucode);
-
-err_load_fw:
-
-	wiphy_err(priv->hw->wiphy, "firmware init fail\n");
 
 	return rc;
 }
@@ -968,7 +954,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	rc = mwl_hif_init(hw);
 	if (rc) {
 		wiphy_err(hw->wiphy, "fail to initialize host interface\n");
-		goto err_hif_init;
+		return rc;
 	}
 
 	/* The cooling device sends firmware commands, so it can only be
@@ -1100,8 +1086,6 @@ err_addresses:
 	mwl_thermal_unregister(priv);
 err_thermal_register:
 	mwl_hif_deinit(hw);
-err_hif_init:
-	wiphy_err(hw->wiphy, "init fail\n");
 
 	return rc;
 }
@@ -1207,16 +1191,12 @@ int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name,
 
 
 	rc = mwl_prepare_cmd_buf(priv);
-	if (rc) {
-		wiphy_err(hw->wiphy, "fail to prepare command buffer\n");
-		return -ENOMEM;
-	}
+	if (rc)
+		return rc;
 
 	rc = mwl_init_firmware(priv, fw_name, cal_name, txpwrlmt_name);
-	if (rc) {
-		wiphy_err(hw->wiphy, "fail to initialize firmware\n");
-		return -EIO;
-	}
+	if (rc)
+		return rc;
 
 	/* firmware is loaded to H/W, it can be released now */
 	release_firmware(priv->fw_ucode);
@@ -1231,10 +1211,8 @@ int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name,
 	release_firmware(priv->txpwrlmt_file);
 	priv->txpwrlmt_file = NULL;
 
-	if (rc) {
-		wiphy_err(hw->wiphy, "fail to initialize wireless lan\n");
-		return -EIO;
-	}
+	if (rc)
+		return rc;
 
 	wiphy_info(priv->hw->wiphy, "2G %s, 5G %s\n",
 		   priv->disable_2g ? "disabled" : "enabled",
