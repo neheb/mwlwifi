@@ -880,6 +880,9 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	hw->wiphy->flags |= WIPHY_FLAG_SUPPORTS_TDLS;
 	hw->wiphy->flags |= WIPHY_FLAG_AP_UAPSD;
 
+	/* mac80211 monitors the signal itself, as beacons aren't filtered. */
+	wiphy_ext_feature_set(hw->wiphy, NL80211_EXT_FEATURE_CQM_RSSI_LIST);
+
 	if (priv->chip_type == MWL8964) {
 		hw->wiphy->cipher_suites = cipher_suites_8964;
 		hw->wiphy->n_cipher_suites = ARRAY_SIZE(cipher_suites_8964);
