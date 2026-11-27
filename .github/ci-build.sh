@@ -43,7 +43,10 @@ rm -rf "$out"
 mkdir -p "$out"
 (cd "$src" && git ls-files -z | xargs -0 cp --parents -t "$out")
 
-$kmake -C "$kout" M="$out" W=1 C=1 KBUILD_MODPOST_WARN=1 \
+# Sparse cannot follow locks released by guard() and scoped_guard() and
+# reports a context imbalance for every function that takes one; kernels
+# from 6.19 on no longer give sparse lock contexts at all.
+$kmake -C "$kout" M="$out" W=1 C=1 CF=-Wno-context KBUILD_MODPOST_WARN=1 \
 	-j"$(nproc)" modules 2>&1 | tee "$out/build.log"
 
 # Undefined symbols are expected: modules_prepare does not build the
