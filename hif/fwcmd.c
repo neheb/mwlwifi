@@ -769,7 +769,6 @@ static int mwl_fwcmd_parse_hex(const u8 *src, size_t len, u8 *dst,
 {
 	const u8 *ptr = src, *end = src + len;
 	size_t n = 0;
-	int hi, lo;
 
 	while (ptr < end && n < max) {
 		if (!isxdigit(*ptr)) {
@@ -777,13 +776,9 @@ static int mwl_fwcmd_parse_hex(const u8 *src, size_t len, u8 *dst,
 			continue;
 		}
 
-		if (end - ptr < 2)
+		if (end - ptr < 2 || hex2bin(&dst[n], ptr, 1))
 			return -EINVAL;
-		hi = hex_to_bin(ptr[0]);
-		lo = hex_to_bin(ptr[1]);
-		if (lo < 0)
-			return -EINVAL;
-		dst[n++] = (hi << 4) | lo;
+		n++;
 		ptr += 2;
 	}
 
