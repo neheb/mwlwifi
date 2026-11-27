@@ -92,9 +92,8 @@ static int pcie_tx_ring_alloc(struct mwl_priv *priv)
 
 		desc->ptx_ring = mem + num * MAX_NUM_TX_RING_BYTES;
 
-		desc->pphys_tx_ring = (dma_addr_t)
-			((u32)pcie_priv->desc_data[0].pphys_tx_ring +
-			num * MAX_NUM_TX_RING_BYTES);
+		desc->pphys_tx_ring = pcie_priv->desc_data[0].pphys_tx_ring +
+				      num * MAX_NUM_TX_RING_BYTES;
 	}
 
 	mem = devm_kcalloc(priv->dev, PCIE_NUM_OF_DESC_DATA,
@@ -130,9 +129,8 @@ static int pcie_tx_ring_init(struct mwl_priv *priv)
 				desc->ptx_ring[i].status =
 					cpu_to_le32(EAGLE_TXD_STATUS_IDLE);
 				desc->ptx_ring[i].pphys_next =
-					cpu_to_le32((u32)desc->pphys_tx_ring +
-					((i + 1) *
-					sizeof(struct pcie_tx_desc)));
+					cpu_to_le32(lower_32_bits(desc->pphys_tx_ring) +
+						    (i + 1) * sizeof(struct pcie_tx_desc));
 				desc->tx_hndl[i].pdesc =
 					&desc->ptx_ring[i];
 				if (i < PCIE_MAX_NUM_TX_DESC - 1)
@@ -140,7 +138,7 @@ static int pcie_tx_ring_init(struct mwl_priv *priv)
 						&desc->tx_hndl[i + 1];
 			}
 			desc->ptx_ring[PCIE_MAX_NUM_TX_DESC - 1].pphys_next =
-				cpu_to_le32((u32)desc->pphys_tx_ring);
+				cpu_to_le32(lower_32_bits(desc->pphys_tx_ring));
 			desc->tx_hndl[PCIE_MAX_NUM_TX_DESC - 1].pnext =
 				&desc->tx_hndl[0];
 

@@ -121,14 +121,14 @@ static int pcie_rx_ring_init(struct mwl_priv *priv)
 			pcie_rx_set_buff(pcie_priv, desc, rx_hndl, page);
 			desc->prx_ring[i].rx_control =
 				EAGLE_RXD_CTRL_DRIVER_OWN;
-			val = (u32)desc->pphys_rx_ring +
+			val = lower_32_bits(desc->pphys_rx_ring) +
 			      ((i + 1) * sizeof(*desc->prx_ring));
 			desc->prx_ring[i].pphys_next = cpu_to_le32(val);
 			if (i < (PCIE_MAX_NUM_RX_DESC - 1))
 				rx_hndl->pnext = &desc->rx_hndl[i + 1];
 		}
 		desc->prx_ring[PCIE_MAX_NUM_RX_DESC - 1].pphys_next =
-			cpu_to_le32((u32)desc->pphys_rx_ring);
+			cpu_to_le32(lower_32_bits(desc->pphys_rx_ring));
 		desc->rx_hndl[PCIE_MAX_NUM_RX_DESC - 1].pnext =
 			&desc->rx_hndl[0];
 		desc->pnext_rx_hndl = &desc->rx_hndl[0];
