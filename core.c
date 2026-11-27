@@ -16,6 +16,7 @@
 /* Description:  This file implements core layer related functions. */
 
 #include <linux/etherdevice.h>
+#include <linux/of_net.h>
 
 #include "sysadpt.h"
 #include "core.h"
@@ -944,6 +945,16 @@ static int mwl_wl_init(struct mwl_priv *priv)
 		goto err_thermal_register;
 	}
 
+	/* An address from the device tree overrides the card's, as in
+	 * mt76; a card without a valid one gets a random address.
+	 */
+	if (is_valid_ether_addr(priv->of_mac_addr))
+		ether_addr_copy(priv->hw_data.mac_addr, priv->of_mac_addr);
+	if (!is_valid_ether_addr(priv->hw_data.mac_addr)) {
+		wiphy_warn(hw->wiphy, "invalid MAC address %pM, using a random one\n",
+			   priv->hw_data.mac_addr);
+		eth_random_addr(priv->hw_data.mac_addr);
+	}
 	SET_IEEE80211_PERM_ADDR(hw, priv->hw_data.mac_addr);
 
 	if (priv->chip_type == MWL8964) {
@@ -1168,6 +1179,14 @@ int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name,
 	int rc;
 	int tx_num = 4, rx_num = 4;
 
+	/* mac-address, local-mac-address or an nvmem cell. Read it before
+	 * the firmware download: an nvmem provider that isn't ready defers
+	 * the probe, and the 88W8964 can't take its firmware a second time
+	 * without a cold boot.
+	 */
+	rc = of_get_mac_address(priv->dev->of_node, priv->of_mac_addr);
+	if (rc == -EPROBE_DEFER)
+		return rc;
 
 	rc = mwl_prepare_cmd_buf(priv);
 	if (rc)
