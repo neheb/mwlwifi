@@ -818,9 +818,10 @@ static int pcie_tx_prepare_ndp(struct ieee80211_hw *hw,
 
 	if (mic_room) {
 		/* The firmware expects the length of a protected
-		 * management frame to include room for the MIC.
+		 * management frame to include room for the MIC. The
+		 * tailroom of a clone is shared, so copy it first.
 		 */
-		if (skb_tailroom(skb) < mic_room &&
+		if ((skb_cloned(skb) || skb_tailroom(skb) < mic_room) &&
 		    pskb_expand_head(skb, 0, mic_room, GFP_ATOMIC)) {
 			ieee80211_free_txskb(hw, skb);
 			return -1;

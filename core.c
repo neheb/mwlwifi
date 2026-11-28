@@ -894,6 +894,11 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	 * the MIC from mac80211, keep using the slow path.
 	 */
 	ieee80211_hw_set(hw, SUPPORT_FAST_XMIT);
+	/* TX only writes the 802.11 header mac80211 built and the headroom
+	 * before it, and maps frames to the device read-only; the A-MSDUs
+	 * of the 88W8864 and 88W8997 are built in a new skb.
+	 */
+	ieee80211_hw_set(hw, SUPPORTS_CLONED_SKBS);
 	ieee80211_hw_set(hw, MFP_CAPABLE);
 
 	hw->wiphy->flags |= WIPHY_FLAG_IBSS_RSN;
