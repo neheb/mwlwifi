@@ -546,8 +546,11 @@ static void mwl_set_ht_caps(struct mwl_priv *priv,
 static void mwl_set_vht_caps(struct mwl_priv *priv,
 			     struct ieee80211_supported_band *band)
 {
-	u32 antenna_num = 4;
-	__le16 highest;
+	/* Chains in each direction; 0 (auto) means all four. */
+	u32 tx_chains = hweight32(priv->antenna_tx ? priv->antenna_tx : 0xf);
+	u32 rx_chains = priv->antenna_rx ? priv->antenna_rx : 4;
+	/* Highest long-GI 80 MHz rate of the streams in the MCS maps below */
+	static const u16 highest[] = { 390, 390, 780, 1170, 1170 };
 
 	band->vht_cap.vht_supported = 1;
 
@@ -584,34 +587,31 @@ static void mwl_set_vht_caps(struct mwl_priv *priv,
 	else
 		band->vht_cap.vht_mcs.rx_mcs_map = cpu_to_le16(0xffea);
 
-	if (priv->antenna_tx == ANTENNA_TX_1) {
+	if (priv->antenna_tx == ANTENNA_TX_1)
 		band->vht_cap.vht_mcs.tx_mcs_map = cpu_to_le16(0xfffe);
-		antenna_num = 1;
-		highest = cpu_to_le16(390);
-	} else if (priv->antenna_tx == ANTENNA_TX_2) {
+	else if (priv->antenna_tx == ANTENNA_TX_2)
 		band->vht_cap.vht_mcs.tx_mcs_map = cpu_to_le16(0xfffa);
-		antenna_num = 2;
-		highest = cpu_to_le16(780);
-	} else {
+	else
 		band->vht_cap.vht_mcs.tx_mcs_map = cpu_to_le16(0xffea);
-		highest = cpu_to_le16(1170);
-	}
 
-	band->vht_cap.vht_mcs.rx_highest = highest;
-	band->vht_cap.vht_mcs.tx_highest = highest;
+	/* Each from its own direction: a client limits what it sends by the
+	 * AP's RX highest rate.
+	 */
+	band->vht_cap.vht_mcs.rx_highest = cpu_to_le16(highest[rx_chains]);
+	band->vht_cap.vht_mcs.tx_highest = cpu_to_le16(highest[tx_chains]);
 
 	if (band->vht_cap.cap & (IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE |
 	    IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE)) {
 		band->vht_cap.cap |=
 			FIELD_PREP(IEEE80211_VHT_CAP_BEAMFORMEE_STS_MASK,
-				   antenna_num - 1);
+				   rx_chains - 1);
 	}
 
 	if (band->vht_cap.cap & (IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE |
 	    IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE)) {
 		band->vht_cap.cap |=
 			FIELD_PREP(IEEE80211_VHT_CAP_SOUNDING_DIMENSIONS_MASK,
-				   antenna_num - 1);
+				   tx_chains - 1);
 	}
 }
 
