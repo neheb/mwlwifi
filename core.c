@@ -317,51 +317,31 @@ static void mwl_process_of_dts(struct mwl_priv *priv)
 #define MWL_PWR_TBL_ENTRY_SIZE \
 	((int)sizeof(__be32) * (2 + SYSADPT_TX_POWER_LEVEL_TOTAL + 2))
 
-/* Pick the power table the way mt76 picks its power-limits node: the
- * first child of marvell,powertable whose "country" or "regdomain" string
- * list names the new country or DFS region, else the last child with
- * neither property.
+/* The table for the country if there is one, else the FCC or ETSI one
+ * depending on the DFS region.
  */
-static struct device_node *mwl_find_pwr_node(struct mwl_priv *priv,
-					     const char *alpha2)
+static struct property *mwl_find_pwr_prop(struct mwl_priv *priv,
+					  const char *alpha2)
 {
-	static const char *const region_names[] = {
-		[NL80211_DFS_FCC] = "FCC",
-		[NL80211_DFS_ETSI] = "ETSI",
-		[NL80211_DFS_JP] = "JP",
-	};
-	struct device_node *cur, *fallback = NULL;
-	const char *region = NULL;
+	struct property *prop;
 
-	if (priv->dfs_region < ARRAY_SIZE(region_names))
-		region = region_names[priv->dfs_region];
-
-	for_each_child_of_node(priv->pwr_node, cur) {
-		if (!of_property_present(cur, "country") &&
-		    !of_property_present(cur, "regdomain")) {
-			of_node_put(fallback);
-			fallback = of_node_get(cur);
-			continue;
-		}
-
-		if (of_property_match_string(cur, "country", alpha2) >= 0 ||
-		    (region &&
-		     of_property_match_string(cur, "regdomain", region) >= 0)) {
-			of_node_put(fallback);
-			return cur;
-		}
+	for_each_property_of_node(priv->pwr_node, prop) {
+		if (!strncmp(prop->name, alpha2, 2))
+			return prop;
 	}
 
-	return fallback;
+	return of_find_property(priv->pwr_node,
+				priv->dfs_region == NL80211_DFS_ETSI ?
+				"ETSI" : "FCC", NULL);
 }
 
-static void mwl_dump_pwr_tbl(struct mwl_priv *priv, struct device_node *np,
+static void mwl_dump_pwr_tbl(struct mwl_priv *priv, const char *name,
 			     int entries)
 {
 	char buf[SYSADPT_TX_POWER_LEVEL_TOTAL * 5 + 1];
 	int i, j, len;
 
-	wiphy_debug(priv->hw->wiphy, "power table: %pOF\n", np);
+	wiphy_debug(priv->hw->wiphy, "regdomain: %s\n", name);
 	for (i = 0; i < entries; i++) {
 		struct mwl_tx_pwr_tbl *tbl = &priv->tx_pwr_tbl[i];
 
@@ -382,24 +362,21 @@ static void mwl_dump_pwr_tbl(struct mwl_priv *priv, struct device_node *np,
  */
 static void mwl_load_pwr_tbl(struct mwl_priv *priv, const char *alpha2)
 {
-	struct device_node *np;
+	struct property *prop;
 	const __be32 *val;
-	int len, entries, i, j;
+	int entries, i, j;
 
 	if (priv->chip_type == MWL8997 || !priv->pwr_node)
 		return;
 
-	np = mwl_find_pwr_node(priv, alpha2);
-	if (!np)
+	prop = mwl_find_pwr_prop(priv, alpha2);
+	if (!prop)
 		return;
-
-	val = of_get_property(np, "table", &len);
-	if (!val)
-		goto out;
 
 	memset(priv->tx_pwr_tbl, 0, sizeof(priv->tx_pwr_tbl));
 
-	entries = min_t(int, len / MWL_PWR_TBL_ENTRY_SIZE,
+	val = prop->value;
+	entries = min_t(int, prop->length / MWL_PWR_TBL_ENTRY_SIZE,
 			SYSADPT_MAX_NUM_CHANNELS);
 	for (i = 0; i < entries; i++) {
 		struct mwl_tx_pwr_tbl *tbl = &priv->tx_pwr_tbl[i];
@@ -412,9 +389,7 @@ static void mwl_load_pwr_tbl(struct mwl_priv *priv, const char *alpha2)
 		tbl->txantenna2 = be32_to_cpup(val++);
 	}
 
-	mwl_dump_pwr_tbl(priv, np, entries);
-out:
-	of_node_put(np);
+	mwl_dump_pwr_tbl(priv, prop->name, entries);
 }
 
 static void mwl_reg_notifier(struct wiphy *wiphy,
