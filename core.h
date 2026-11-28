@@ -225,6 +225,7 @@ struct mwl_priv {
 		void *priv;
 	} hif;
 
+	struct device_node *dt_node;
 	struct device_node *pwr_node;
 	bool disable_2g;
 	bool disable_5g;

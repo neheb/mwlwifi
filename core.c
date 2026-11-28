@@ -277,25 +277,27 @@ static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name,
 	return rc;
 }
 
-/* The PCI core attaches the device's node, a child of the PCIe port with
- * a matching reg, to dev->of_node.
- */
 static void mwl_process_of_dts(struct mwl_priv *priv)
 {
-	struct device_node *np = priv->dev->of_node;
+#ifdef CONFIG_OF
+	struct property *prop;
 	u32 chainmask[2];
 
-	if (!np)
+	priv->dt_node = of_get_child_by_name(mwl_hif_device_node(priv->hw),
+					     "mwlwifi");
+	if (!priv->dt_node)
 		return;
 
-	/* The value is ignored: the property's presence disables the band. */
-	if (of_property_present(np, "marvell,2ghz"))
-		priv->disable_2g = true;
-	if (of_property_present(np, "marvell,5ghz"))
-		priv->disable_5g = true;
+	/* look for all matching property names */
+	for_each_property_of_node(priv->dt_node, prop) {
+		if (strcmp(prop->name, "marvell,2ghz") == 0)
+			priv->disable_2g = true;
+		if (strcmp(prop->name, "marvell,5ghz") == 0)
+			priv->disable_5g = true;
+	}
 
 	/* <tx rx>; ignored unless both cells are present */
-	if (!of_property_read_u32_array(np, "marvell,chainmask",
+	if (!of_property_read_u32_array(priv->dt_node, "marvell,chainmask",
 					chainmask, ARRAY_SIZE(chainmask))) {
 		if (chainmask[0] == 2)
 			priv->antenna_tx = ANTENNA_TX_2;
@@ -308,7 +310,9 @@ static void mwl_process_of_dts(struct mwl_priv *priv)
 			priv->antenna_rx = ANTENNA_RX_3;
 	}
 
-	priv->pwr_node = of_get_child_by_name(np, "marvell,powertable");
+	priv->pwr_node = of_get_child_by_name(priv->dt_node,
+					      "marvell,powertable");
+#endif
 }
 
 /* Each power table entry is channel, setcap, the power levels, cdd and
@@ -1042,8 +1046,6 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	priv->led_blink_rate = LED_BLINK_RATE_MID;
 	mwl_fwcmd_led_ctrl(hw, priv->led_blink_enable, priv->led_blink_rate);
 
-	wiphy_read_of_freq_limits(hw->wiphy);
-
 	rc = ieee80211_register_hw(hw);
 	if (rc) {
 		wiphy_err(hw->wiphy, "fail to register device\n");
@@ -1166,6 +1168,7 @@ void mwl_free_hw(struct ieee80211_hw *hw)
 	struct mwl_priv *priv = hw->priv;
 
 	of_node_put(priv->pwr_node);
+	of_node_put(priv->dt_node);
 
 	ieee80211_free_hw(hw);
 }
