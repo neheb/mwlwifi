@@ -615,6 +615,27 @@ static void mwl_set_vht_caps(struct mwl_priv *priv,
 	}
 }
 
+/* Rebuild the HT and VHT capabilities of the bands for the current
+ * antenna_tx and antenna_rx.
+ */
+void mwl_update_stream_caps(struct mwl_priv *priv)
+{
+	struct ieee80211_supported_band *bands[] = {
+		priv->disable_2g ? NULL : &priv->band_24,
+		priv->disable_5g ? NULL : &priv->band_50,
+	};
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(bands); i++) {
+		if (!bands[i])
+			continue;
+		memset(&bands[i]->ht_cap, 0, sizeof(bands[i]->ht_cap));
+		memset(&bands[i]->vht_cap, 0, sizeof(bands[i]->vht_cap));
+		mwl_set_ht_caps(priv, bands[i]);
+		mwl_set_vht_caps(priv, bands[i]);
+	}
+}
+
 static void mwl_set_caps(struct mwl_priv *priv)
 {
 	struct ieee80211_hw *hw;
@@ -637,9 +658,6 @@ static void mwl_set_caps(struct mwl_priv *priv)
 		priv->band_24.bitrates = priv->rates_24;
 		priv->band_24.n_bitrates = ARRAY_SIZE(mwl_rates_24);
 
-		mwl_set_ht_caps(priv, &priv->band_24);
-		mwl_set_vht_caps(priv, &priv->band_24);
-
 		hw->wiphy->bands[NL80211_BAND_2GHZ] = &priv->band_24;
 	}
 
@@ -659,11 +677,10 @@ static void mwl_set_caps(struct mwl_priv *priv)
 		priv->band_50.bitrates = priv->rates_50;
 		priv->band_50.n_bitrates = ARRAY_SIZE(mwl_rates_50);
 
-		mwl_set_ht_caps(priv, &priv->band_50);
-		mwl_set_vht_caps(priv, &priv->band_50);
-
 		hw->wiphy->bands[NL80211_BAND_5GHZ] = &priv->band_50;
 	}
+
+	mwl_update_stream_caps(priv);
 }
 
 static void mwl_heartbeat_handle(struct work_struct *work)

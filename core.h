@@ -542,6 +542,8 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 
 void mwl_free_hw(struct ieee80211_hw *hw);
 
+void mwl_update_stream_caps(struct mwl_priv *priv);
+
 int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name,
 		const char *cal_name, const char *txpwrlmt_name);
 

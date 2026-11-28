@@ -680,6 +680,58 @@ static int mwl_mac80211_set_rts_threshold(struct ieee80211_hw *hw,
 	return mwl_fwcmd_set_rts_threshold(hw, value);
 }
 
+/* The firmware takes the first one, two, three or all four chains, so
+ * accept masks of those; cfg80211 has already limited them to the
+ * available ones (from the device tree).
+ */
+static int mwl_mac80211_set_antenna(struct ieee80211_hw *hw, int radio_idx,
+				    u32 tx_ant, u32 rx_ant)
+{
+	static const int ant_tx[] = {
+		[0x1] = ANTENNA_TX_1, [0x3] = ANTENNA_TX_2,
+		[0x7] = ANTENNA_TX_3, [0xf] = ANTENNA_TX_4_AUTO,
+	};
+	static const int ant_rx[] = {
+		[0x1] = ANTENNA_RX_1, [0x3] = ANTENNA_RX_2,
+		[0x7] = ANTENNA_RX_3, [0xf] = ANTENNA_RX_4_AUTO,
+	};
+	struct mwl_priv *priv = hw->priv;
+	int rc;
+
+	if (tx_ant >= ARRAY_SIZE(ant_tx) || !is_power_of_2(tx_ant + 1) ||
+	    rx_ant >= ARRAY_SIZE(ant_rx) || !is_power_of_2(rx_ant + 1) ||
+	    !tx_ant || !rx_ant)
+		return -EINVAL;
+
+	rc = mwl_fwcmd_rf_antenna(hw, WL_ANTENNATYPE_TX, ant_tx[tx_ant]);
+	if (!rc)
+		rc = mwl_fwcmd_rf_antenna(hw, WL_ANTENNATYPE_RX,
+					  ant_rx[rx_ant]);
+	if (rc)
+		return rc;
+
+	priv->antenna_tx = ant_tx[tx_ant];
+	priv->antenna_rx = ant_rx[rx_ant];
+	/* mac80211 only gets here while the radio is stopped, so nothing
+	 * uses the capabilities yet.
+	 */
+	mwl_update_stream_caps(priv);
+
+	return 0;
+}
+
+static int mwl_mac80211_get_antenna(struct ieee80211_hw *hw, int radio_idx,
+				    u32 *tx_ant, u32 *rx_ant)
+{
+	struct mwl_priv *priv = hw->priv;
+
+	/* antenna_tx is a mask and antenna_rx a count; 0 is all four. */
+	*tx_ant = priv->antenna_tx ? priv->antenna_tx : 0xf;
+	*rx_ant = priv->antenna_rx ? GENMASK(priv->antenna_rx - 1, 0) : 0xf;
+
+	return 0;
+}
+
 static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 				struct ieee80211_vif *vif,
 				struct ieee80211_sta *sta)
@@ -1143,6 +1195,8 @@ const struct ieee80211_ops mwl_mac80211_ops = {
 	.configure_filter   = mwl_mac80211_configure_filter,
 	.set_key            = mwl_mac80211_set_key,
 	.set_rts_threshold  = mwl_mac80211_set_rts_threshold,
+	.set_antenna        = mwl_mac80211_set_antenna,
+	.get_antenna        = mwl_mac80211_get_antenna,
 	.sta_state          = mwl_mac80211_sta_state,
 	.conf_tx            = mwl_mac80211_conf_tx,
 	.get_stats          = mwl_mac80211_get_stats,
