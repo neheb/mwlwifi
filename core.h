@@ -255,7 +255,6 @@ struct mwl_priv {
 
 	int irq;
 	struct mwl_hw_data hw_data;  /* Adapter HW specific info     */
-	u8 of_mac_addr[ETH_ALEN];    /* From the device tree, if any  */
 	/* GET_HW_SPEC result from probe. The 88W8964 firmware stops
 	 * beaconing if the command is sent again while it is running.
 	 */
