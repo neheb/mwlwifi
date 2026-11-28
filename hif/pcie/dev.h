@@ -458,7 +458,8 @@ enum { /* Type of Key */
 #define HT_SIG1_CBW             BIT(7)
 #define HT_SIG2_SGI             BIT(7)
 #define VHT_SIG1_BW             GENMASK(1, 0)
-#define VHT_SIG1_NSS            GENMASK(11, 10)
+#define VHT_SIG1_STBC           BIT(3)
+#define VHT_SIG1_NSS            GENMASK(12, 10)
 #define VHT_SIG2_SGI            BIT(0)
 #define VHT_SIG2_MCS            GENMASK(7, 4)
 

@@ -1148,8 +1148,9 @@ static void pcie_rx_account(struct mwl_priv *priv,
 			return;
 		break;
 	case RX_RATE_INFO_FORMAT_11N:
-		if (FIELD_GET(HT_SIG1_MCS, sig1) >= 16)
-			return;
+		/* MCS 16-31 are three and four streams, which the AP
+		 * receives too.
+		 */
 		bw = FIELD_GET(HT_SIG1_CBW, sig1);
 		gi = FIELD_GET(HT_SIG2_SGI, sig2);
 		rate_mcs = FIELD_GET(HT_SIG1_MCS, sig1);
@@ -1159,9 +1160,16 @@ static void pcie_rx_account(struct mwl_priv *priv,
 	case RX_RATE_INFO_FORMAT_11AC:
 		if (FIELD_GET(VHT_SIG2_MCS, sig2) >= 10)
 			return;
+		/* The field holds the space-time streams minus one, and STBC
+		 * sends each spatial stream on two of them. nss is kept as
+		 * spatial streams minus one.
+		 */
 		nss = FIELD_GET(VHT_SIG1_NSS, sig1);
-		if (!nss)
-			return;
+		if (sig1 & VHT_SIG1_STBC) {
+			if (!nss) /* STBC needs two */
+				return;
+			nss = (nss + 1) / 2 - 1;
+		}
 		bw = FIELD_GET(VHT_SIG1_BW, sig1);
 		gi = FIELD_GET(VHT_SIG2_SGI, sig2);
 		rate_mcs = FIELD_GET(VHT_SIG2_MCS, sig2);
